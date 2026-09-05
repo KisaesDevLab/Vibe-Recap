@@ -1,7 +1,7 @@
 # Vibe Recap
 
-Self-hosted appliance for CPA firms. A preparer uploads a finished Form 1040 package (PDF from
-UltraTax, Lacerte, CCH Axcess, GoSystem, Drake, or ProSeries); Recap extracts the figures,
+Self-hosted appliance for CPA firms. A preparer uploads a finished Form 1040 client copy from
+UltraTax CS (the only software accepted in v1); Recap extracts the figures,
 writes a plain-English narrated video summary for the client, and lets the preparer review,
 approve, and download it for delivery through the firm's own channel.
 
@@ -27,6 +27,9 @@ upload → identify → extract → recon gate → script (local LLM) → valida
 - **Changes by instruction.** A preparer can ask for changes in plain English on the job page;
   the script is rewritten with that instruction and runs through the same gates again. A rewrite
   that fails them leaves the previous script and video in place.
+- **Thumbs up or down on every recap.** A thumbs-down names what went wrong and keeps the
+  return, extraction, script, and video for 90 days so the cause can be fixed; Settings › Quality
+  shows the rate, the reasons, and a diagnostic bundle per case.
 - **Preparer approval before release.** Approve snapshots the script, the extraction, and the
   verification. Delivery is download only: MP4, captions, transcript, or one ZIP.
 - **Retention is a job, not a promise.** An hourly purge is the only thing that deletes files, and

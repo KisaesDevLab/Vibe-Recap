@@ -3,6 +3,7 @@ import {
   bigserial,
   boolean,
   index,
+  uniqueIndex,
   integer,
   jsonb,
   pgEnum,
@@ -283,3 +284,34 @@ export const jobRevisions = pgTable(
 );
 
 export type JobRevision = typeof jobRevisions.$inferSelect;
+
+/**
+ * Preparer feedback on a finished recap: one row per user per job, updated in place. A thumbs-down
+ * puts the job's files on hold past the retention windows (hold_until, 90 days) so the failure can
+ * be studied; an admin dismisses the feedback to release the hold early. Never purged.
+ */
+export const jobFeedback = pgTable(
+  "job_feedback",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    jobId: uuid("job_id")
+      .notNull()
+      .references(() => jobs.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    userLabel: text("user_label").notNull(),
+    verdict: text("verdict").notNull(), // up | down
+    reasons: jsonb("reasons").$type<string[]>().notNull().default([]),
+    note: text("note"),
+    holdUntil: timestamp("hold_until", { withTimezone: true }),
+    dismissedAt: timestamp("dismissed_at", { withTimezone: true }),
+    dismissedBy: uuid("dismissed_by"),
+    dismissedByLabel: text("dismissed_by_label"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("job_feedback_job_idx").on(t.jobId), uniqueIndex("job_feedback_job_user_uq").on(t.jobId, t.userId), index("job_feedback_hold_idx").on(t.holdUntil)],
+);
+
+export type JobFeedback = typeof jobFeedback.$inferSelect;

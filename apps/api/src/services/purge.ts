@@ -20,6 +20,7 @@ import type { FileKind } from "@vibe-recap/shared";
 import { clients, files, jobEvents, jobs, type Client, type FileRow, type Job } from "../db/schema.js";
 import { audit, SYSTEM_RETENTION, type Actor } from "./audit.js";
 import { getAllSettings } from "./settings.js";
+import { heldJobIds } from "../routes/feedback.js";
 
 const SOURCE_KINDS: FileKind[] = ["source", "prior"];
 const EXTRACTION_KINDS: FileKind[] = ["extraction", "script", "verification"];
@@ -37,6 +38,8 @@ export interface PurgeResult {
   purgedFiles: number;
   purgedJobs: number;
   skippedLegalHold: number;
+  /** Files kept because a thumbs-down holds the job for study (Q46); released by time or an admin dismissal. */
+  skippedFeedbackHold: number;
 }
 
 function daysAgo(now: Date, days: number): Date {
@@ -81,20 +84,28 @@ export function dueFiles(job: Job, client: Client, jobFiles: FileRow[], windows:
   return out;
 }
 
-export async function collectCandidates(app: FastifyInstance, now: Date, clientId?: string, everything = false): Promise<{ candidates: PurgeCandidate[]; skippedLegalHold: number }> {
+export async function collectCandidates(app: FastifyInstance, now: Date, clientId?: string, everything = false): Promise<{ candidates: PurgeCandidate[]; skippedLegalHold: number; skippedFeedbackHold: number }> {
   const settings = await getAllSettings(app.db);
   const rows = await app.db
     .select({ job: jobs, client: clients })
     .from(jobs)
     .innerJoin(clients, eq(clients.id, jobs.clientId))
     .where(and(sql`${jobs.status} <> 'purged'`, clientId ? eq(jobs.clientId, clientId) : undefined));
+  const held = await heldJobIds(app.db, now);
   const candidates: PurgeCandidate[] = [];
   let skippedLegalHold = 0;
+  let skippedFeedbackHold = 0;
   for (const { job, client } of rows) {
     const jobFiles = await app.db.select().from(files).where(and(eq(files.jobId, job.id), isNull(files.purgedAt)));
     if (jobFiles.length === 0) continue;
     if (client.legalHold) {
       skippedLegalHold += jobFiles.length;
+      continue;
+    }
+    if (held.has(job.id)) {
+      // A thumbs-down keeps everything about the job, including under "purge now", until the hold
+      // lapses or an admin dismisses the feedback on the Quality page.
+      skippedFeedbackHold += jobFiles.length;
       continue;
     }
     if (everything) {
@@ -103,7 +114,7 @@ export async function collectCandidates(app: FastifyInstance, now: Date, clientI
     }
     candidates.push(...dueFiles(job, client, jobFiles, effectiveWindows(settings, client), now));
   }
-  return { candidates, skippedLegalHold };
+  return { candidates, skippedLegalHold, skippedFeedbackHold };
 }
 
 export async function runPurge(
@@ -112,8 +123,8 @@ export async function runPurge(
 ): Promise<PurgeResult> {
   const now = opts.now ?? new Date();
   const actor = opts.actor ?? SYSTEM_RETENTION;
-  const { candidates, skippedLegalHold } = await collectCandidates(app, now, opts.clientId, opts.everything);
-  if (opts.dryRun) return { dryRun: true, candidates, purgedFiles: 0, purgedJobs: 0, skippedLegalHold };
+  const { candidates, skippedLegalHold, skippedFeedbackHold } = await collectCandidates(app, now, opts.clientId, opts.everything);
+  if (opts.dryRun) return { dryRun: true, candidates, purgedFiles: 0, purgedJobs: 0, skippedLegalHold, skippedFeedbackHold };
 
   const touchedJobs = new Set<string>();
   for (const c of candidates) {
@@ -137,19 +148,20 @@ export async function runPurge(
       purgedJobs++;
     }
   }
-  if (candidates.length) app.log.info({ purgedFiles: candidates.length, purgedJobs, actor: actor.label }, "purge run");
-  return { dryRun: false, candidates, purgedFiles: candidates.length, purgedJobs, skippedLegalHold };
+  if (candidates.length) app.log.info({ purgedFiles: candidates.length, purgedJobs, skippedFeedbackHold, actor: actor.label }, "purge run");
+  return { dryRun: false, candidates, purgedFiles: candidates.length, purgedJobs, skippedLegalHold, skippedFeedbackHold };
 }
 
 /** Counts of files by kind due within the next `days` days. */
-export async function retentionReport(app: FastifyInstance, days = 7): Promise<{ dueByKind: Record<string, number>; dueNow: number; legalHoldClients: number }> {
+export async function retentionReport(app: FastifyInstance, days = 7): Promise<{ dueByKind: Record<string, number>; dueNow: number; legalHoldClients: number; feedbackHoldJobs: number }> {
   const horizon = new Date(Date.now() + days * 86400_000);
   const { candidates } = await collectCandidates(app, horizon);
   const nowRun = await collectCandidates(app, new Date());
   const dueByKind: Record<string, number> = {};
   for (const c of candidates) dueByKind[c.file.kind] = (dueByKind[c.file.kind] ?? 0) + 1;
   const [held] = await app.db.select({ n: sql<number>`count(*)` }).from(clients).where(eq(clients.legalHold, true));
-  return { dueByKind, dueNow: nowRun.candidates.length, legalHoldClients: Number(held?.n ?? 0) };
+  const feedbackHeld = await heldJobIds(app.db, new Date());
+  return { dueByKind, dueNow: nowRun.candidates.length, legalHoldClients: Number(held?.n ?? 0), feedbackHoldJobs: feedbackHeld.size };
 }
 
 /**

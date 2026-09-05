@@ -5,7 +5,7 @@ import { Alert, Button, Card, Field, Input, PageTitle, Spinner } from "../ui";
 
 interface RetentionResponse {
   settings: { retention_source_days: number; retention_extraction_days: number; retention_video_days: number; retention_failed_days: number };
-  report: { dueByKind: Record<string, number>; dueNow: number; legalHoldClients: number };
+  report: { dueByKind: Record<string, number>; dueNow: number; legalHoldClients: number; feedbackHoldJobs: number };
 }
 
 const FIELDS: Array<{ key: keyof RetentionResponse["settings"]; label: string; help: string }> = [
@@ -19,7 +19,7 @@ export function SettingsRetentionPage() {
   const { data, loading, error, reload } = useApi<RetentionResponse>("/api/settings/retention");
   const [msg, setMsg] = useState<{ kind: "error" | "success" | "info"; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
-  const [preview, setPreview] = useState<{ purgedFiles?: number; preview: Array<{ jobId: string; kind: string; reason: string }>; skippedLegalHold: number } | null>(null);
+  const [preview, setPreview] = useState<{ purgedFiles?: number; preview: Array<{ jobId: string; kind: string; reason: string }>; skippedLegalHold: number; skippedFeedbackHold: number } | null>(null);
 
   if (loading && !data) return <Spinner />;
   if (error || !data) return <Alert kind="error">{error ?? "Could not load"}</Alert>;
@@ -46,8 +46,8 @@ export function SettingsRetentionPage() {
     setBusy(true);
     setMsg(null);
     try {
-      const r = await post<{ dryRun: boolean; purgedFiles: number; purgedJobs: number; skippedLegalHold: number; preview: Array<{ jobId: string; kind: string; reason: string }> }>("/api/settings/retention/purge-now", { confirm });
-      if (r.dryRun) setPreview({ preview: r.preview, skippedLegalHold: r.skippedLegalHold });
+      const r = await post<{ dryRun: boolean; purgedFiles: number; purgedJobs: number; skippedLegalHold: number; skippedFeedbackHold: number; preview: Array<{ jobId: string; kind: string; reason: string }> }>("/api/settings/retention/purge-now", { confirm });
+      if (r.dryRun) setPreview({ preview: r.preview, skippedLegalHold: r.skippedLegalHold, skippedFeedbackHold: r.skippedFeedbackHold });
       else {
         setPreview(null);
         setMsg({ kind: "success", text: `Purged ${r.purgedFiles} file(s) across ${r.purgedJobs} job(s).` });
@@ -100,7 +100,7 @@ export function SettingsRetentionPage() {
               </tbody>
             </table>
             <p className="mt-2 text-xs text-slate-500">
-              Due right now: {data.report.dueNow}. Clients on legal hold: {data.report.legalHoldClients}.{" "}
+              Due right now: {data.report.dueNow}. Clients on legal hold: {data.report.legalHoldClients}. Jobs held for feedback review: {data.report.feedbackHoldJobs}.{" "}
               <a href="/api/settings/retention/report.csv" className="text-brand hover:underline">
                 Download CSV
               </a>
@@ -136,6 +136,7 @@ export function SettingsRetentionPage() {
                   </table>
                 )}
                 {preview.skippedLegalHold > 0 && <p className="p-2 text-amber-700">{preview.skippedLegalHold} file(s) skipped because of legal holds.</p>}
+                {preview.skippedFeedbackHold > 0 && <p className="p-2 text-amber-700">{preview.skippedFeedbackHold} file(s) kept because a thumbs-down holds the job (Settings › Quality).</p>}
               </div>
             )}
           </Card>

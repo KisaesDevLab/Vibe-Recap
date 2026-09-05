@@ -283,3 +283,45 @@ export interface RevisionDto {
   attempts: number;
   scriptSha256After: string | null;
 }
+
+// ---------------------------------------------------------------------------
+// Feedback: thumbs up / down on a finished recap (Q46)
+// ---------------------------------------------------------------------------
+
+export interface FeedbackDto {
+  id: string;
+  jobId: string;
+  verdict: "up" | "down";
+  reasons: string[];
+  note: string | null;
+  by: string;
+  createdAt: string;
+  updatedAt: string;
+  /** Files of the job are kept until this time (thumbs-down only) unless dismissed. */
+  holdUntil: string | null;
+  dismissedAt: string | null;
+  dismissedBy: string | null;
+}
+
+export interface FeedbackAdminRowDto extends FeedbackDto {
+  clientId: string;
+  clientName: string;
+  taxYear: number | null;
+  jobStatus: JobStatus;
+  software: string | null;
+  filesPurged: boolean;
+}
+
+export interface FeedbackStatsDto {
+  days: number;
+  up: number;
+  down: number;
+  byReason: Record<string, number>;
+  openHolds: number;
+}
+
+export interface FeedbackListDto {
+  stats: FeedbackStatsDto;
+  rows: FeedbackAdminRowDto[];
+  total: number;
+}

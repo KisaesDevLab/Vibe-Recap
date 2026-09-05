@@ -61,6 +61,9 @@ total tax (verifier now feeds back into the retry loop), and the "tax year exact
   videos render. Four verifier gaps found by those runs are fixed and covered by tests;
   `worker/tests/test_real_returns.py` re-checks any PDFs under `tests/fixtures/real/`. The other five vendor profiles remain
   validated on synthetic fixtures only; real samples are the next thing to ask for.
+- UltraTax only (Q45): staging skips other vendors' packages; scanned packages pass to OCR.
+- Feedback (Q46): thumbs up/down per job with reasons, 90-day retention hold on thumbs-down,
+  Settings › Quality with counts, dismiss, and a diagnostic bundle per case.
 - Revision requests (Q40): `job_revisions` table, `POST /api/jobs/:id/revisions`, worker
   `revise()` in `script/generate.py`, `RevisionKept` restores the previous status on rejection,
   "Ask for changes" panel on the job page. Exercised live on 2026-09-05 with qwen3:8b: the

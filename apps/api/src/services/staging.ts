@@ -9,7 +9,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { and, eq, gt, sql } from "drizzle-orm";
 import type { Redis } from "ioredis";
-import type { ClientMatch, DetectedInfo, StageDto, StagedFileDto, StagedFilePatch } from "@vibe-recap/shared";
+import { ACCEPTED_SOFTWARE, SOFTWARE_LABELS, type ClientMatch, type DetectedInfo, type StageDto, type StagedFileDto, type StagedFilePatch } from "@vibe-recap/shared";
 import type { Db } from "../db/index.js";
 import { batches, clients, files, jobs } from "../db/schema.js";
 import { badRequest, notFound } from "../errors.js";
@@ -155,6 +155,18 @@ export class StagingService {
       pageCount: result.pageCount ?? null,
     };
     base.taxYear = base.detected.taxYear;
+    // v1 accepts UltraTax CS client copies only (Q45). A scanned package has no text to name its
+    // software; it is let through for OCR and read with the UltraTax profile.
+    const software = result.software ?? "unknown";
+    const scanned = (result.textCoverage ?? 1) < 0.5;
+    if (!(ACCEPTED_SOFTWARE as readonly string[]).includes(software)) {
+      if (software === "unknown" && scanned) {
+        base.warnings.push("no text layer; the software could not be identified. The package will be OCR'd and read as an UltraTax CS return.");
+      } else {
+        await this.storage.shred(base.blob.path, base.blob.keyPath);
+        return skip(software === "unknown" ? "not recognised as an UltraTax CS client copy; v1 accepts UltraTax packages only" : `${SOFTWARE_LABELS[software] ?? software} package; v1 accepts UltraTax CS packages only`);
+      }
+    }
     if (result.form && result.form !== "1040" && result.form !== "1040-SR") {
       base.warnings.push(`detected ${result.form}; only Form 1040 packages are supported in v1`);
     }

@@ -62,6 +62,7 @@ export async function retentionRoutes(app: FastifyInstance) {
       purgedFiles: result.purgedFiles,
       purgedJobs: result.purgedJobs,
       skippedLegalHold: result.skippedLegalHold,
+      skippedFeedbackHold: result.skippedFeedbackHold,
       preview: result.candidates.slice(0, 500).map((c) => ({ jobId: c.job.id, clientId: c.job.clientId, kind: c.file.kind, reason: c.reason })),
     };
   });

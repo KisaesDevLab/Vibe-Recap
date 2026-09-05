@@ -189,28 +189,28 @@ describe.skipIf(!available)("upload staging and queueing", () => {
       const cur = await fixture(`${sw}-1040-2025-mfj-refund-mo.pdf`);
       entries.push({ name: `mfj/${sw}.pdf`, data: cur });
       // only the ultratax file keeps the shared taxpayer name so exactly one prior-year pair forms
-      ctx.stager.bySha.set(sha(cur), { ok: true, firstName: "Alex", lastName: sw === "ultratax" ? "Fixture" : `Fixture${sw}`, spouseFirstName: "Jordan", taxYear: 2025, software: sw, form: "1040", pageCount: 5 });
+      ctx.stager.bySha.set(sha(cur), { ok: true, firstName: "Alex", lastName: sw === "ultratax" ? "Fixture" : `Fixture${sw}`, spouseFirstName: "Jordan", taxYear: 2025, software: "ultratax", form: "1040", pageCount: 5 });
     }
     for (const sw of ["ultratax", "drake"]) {
       const prior = await fixture(`${sw}-1040-2024-mfj-refund-mo-prior.pdf`);
       // give each prior a distinct taxpayer so pairs are unambiguous
       entries.push({ name: `prior/${sw}.pdf`, data: prior });
-      ctx.stager.bySha.set(sha(prior), { ok: true, firstName: "Alex", lastName: sw === "ultratax" ? "Fixture" : "Fixtureprior", spouseFirstName: "Jordan", taxYear: 2024, software: sw, form: "1040", pageCount: 4 });
+      ctx.stager.bySha.set(sha(prior), { ok: true, firstName: "Alex", lastName: sw === "ultratax" ? "Fixture" : "Fixtureprior", spouseFirstName: "Jordan", taxYear: 2024, software: "ultratax", form: "1040", pageCount: 4 });
     }
     for (const sw of softwares) {
       const single = await fixture(`${sw}-1040-2025-single-owed-itemized.pdf`);
       entries.push({ name: `single/${sw}.pdf`, data: single });
-      ctx.stager.bySha.set(sha(single), { ok: true, firstName: "Casey", lastName: `Sample${sw}`, taxYear: 2025, software: sw, form: "1040", pageCount: 4 });
+      ctx.stager.bySha.set(sha(single), { ok: true, firstName: "Casey", lastName: `Sample${sw}`, taxYear: 2025, software: "ultratax", form: "1040", pageCount: 4 });
     }
     for (const sw of softwares) {
       const hoh = await fixture(`${sw}-1040-2025-hoh-refund-two-states.pdf`);
       entries.push({ name: `hoh/${sw}.pdf`, data: hoh });
-      ctx.stager.bySha.set(sha(hoh), { ok: true, firstName: "Morgan", lastName: "Placeholder", taxYear: 2025, software: sw, form: "1040", pageCount: 4 });
+      ctx.stager.bySha.set(sha(hoh), { ok: true, firstName: "Morgan", lastName: "Placeholder", taxYear: 2025, software: "ultratax", form: "1040", pageCount: 4 });
     }
     for (const sw of ["cch", "gosystem", "proseries"]) {
       const p = await fixture(`${sw}-1040-2024-hoh-refund-two-states-prior.pdf`);
       entries.push({ name: `hohprior/${sw}.pdf`, data: p });
-      ctx.stager.bySha.set(sha(p), { ok: true, firstName: "Morgan", lastName: `Placeholder${sw}`, taxYear: 2024, software: sw, form: "1040", pageCount: 3 });
+      ctx.stager.bySha.set(sha(p), { ok: true, firstName: "Morgan", lastName: `Placeholder${sw}`, taxYear: 2024, software: "ultratax", form: "1040", pageCount: 3 });
     }
     entries.push({ name: "locked.pdf", data: Buffer.from("%PDF-1.4\ntrailer<</Encrypt 1 0 R>>") });
     entries.push({ name: "readme.txt", data: Buffer.from("not a return") });
@@ -252,7 +252,7 @@ describe.skipIf(!available)("upload staging and queueing", () => {
 
   it("lets the preparer fix a row and refuses to queue rows without a client or year", async () => {
     const pdf = await fixture("proseries-1040-2025-single-owed-itemized.pdf");
-    ctx.stager.bySha.set(sha(pdf), { ok: true, firstName: null, lastName: null, taxYear: null, software: "proseries", form: "1040", pageCount: 4 });
+    ctx.stager.bySha.set(sha(pdf), { ok: true, firstName: null, lastName: null, taxYear: null, software: "ultratax", form: "1040", pageCount: 4 });
     const dto = await stage([{ name: "mystery.pdf", data: pdf }]);
     const row = dto.files[0]!;
     expect(row.warnings.join(" ")).toMatch(/tax year not detected/);
@@ -268,11 +268,32 @@ describe.skipIf(!available)("upload staging and queueing", () => {
 
   it("warns on a duplicate upload for the same client within 30 days and audits each upload", async () => {
     const pdf = await fixture("lacerte-1040-2025-hoh-refund-two-states.pdf");
-    ctx.stager.bySha.set(sha(pdf), { ok: true, firstName: "Morgan", lastName: "Placeholder", taxYear: 2025, software: "lacerte", form: "1040", pageCount: 4 });
+    ctx.stager.bySha.set(sha(pdf), { ok: true, firstName: "Morgan", lastName: "Placeholder", taxYear: 2025, software: "ultratax", form: "1040", pageCount: 4 });
     const dto = await stage([{ name: "again.pdf", data: pdf }]);
     expect(dto.files[0]!.warnings.join(" ")).toMatch(/already uploaded/);
     const rows = await ctx.db.execute<{ n: number }>(sql`select count(*)::int as n from audit_events where action = 'job.upload'`);
     expect(Number(rows[0]!.n)).toBeGreaterThanOrEqual(23);
+  });
+
+  it("skips packages from other tax software and lets a scanned package through for OCR (Q45)", async () => {
+    const drake = await fixture("drake-1040-2025-mfj-refund-mo.pdf");
+    ctx.stager.bySha.set(sha(drake), { ok: true, firstName: "Alex", lastName: "Other", taxYear: 2025, software: "drake", form: "1040", pageCount: 5 });
+    const cch = await fixture("cch-1040-2025-single-owed-itemized.pdf");
+    ctx.stager.bySha.set(sha(cch), { ok: true, firstName: "Casey", lastName: "Unknown", taxYear: 2025, software: "unknown", form: "1040", pageCount: 4, textCoverage: 1 });
+    const scanned = await fixture("gosystem-1040-2025-hoh-refund-two-states.pdf");
+    ctx.stager.bySha.set(sha(scanned), { ok: true, firstName: null, lastName: null, taxYear: null, software: "unknown", form: null, pageCount: 4, textCoverage: 0 });
+    const dto = await stage([
+      { name: "drake.pdf", data: drake },
+      { name: "mystery.pdf", data: cch },
+      { name: "scan.pdf", data: scanned },
+    ]);
+    const byName = Object.fromEntries(dto.files.map((f) => [f.originalName, f]));
+    expect(byName["drake.pdf"]!.status).toBe("skipped");
+    expect(byName["drake.pdf"]!.skipReason).toMatch(/Drake package; v1 accepts UltraTax/);
+    expect(byName["mystery.pdf"]!.status).toBe("skipped");
+    expect(byName["mystery.pdf"]!.skipReason).toMatch(/not recognised as an UltraTax/);
+    expect(byName["scan.pdf"]!.status).toBe("ok");
+    expect(byName["scan.pdf"]!.warnings.join(" ")).toMatch(/OCR/);
   });
 
   it("staff can upload, viewer cannot", async () => {

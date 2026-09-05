@@ -19,6 +19,7 @@ export interface StageResult {
   software?: string | null;
   form?: string | null;
   pageCount?: number | null;
+  textCoverage?: number | null; // share of pages with a text layer; low means scanned (OCR path)
 }
 
 export interface Stager {
