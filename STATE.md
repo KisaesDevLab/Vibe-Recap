@@ -25,8 +25,18 @@ Updated by Claude Code at the end of each phase. Read after CLAUDE.md, docs/PLAN
 - GLM-OCR's real output format (Q19). OCR tests use a stand-in engine.
 - The licensing server contract (Q31). Tests use a fake client.
 - The ship gate: a CPA who is not the author following INSTALL.md on a fresh host.
-- Script quality with the real model: one CPU run on this box exceeded the original 180 s
-  timeout; the timeout is now 600 s and thinking is disabled. Re-run `scripts/smoke-e2e.py`.
+
+## Verified end to end on the dev box (2026-09-05)
+
+`scripts/smoke-e2e.py` with the Lacerte single/itemized fixture against the compose stack and the
+real `qwen3:8b`: upload staged in 0.3 s, ingest through recon in 0.5 s, script accepted on the
+second attempt (2 m 40 s on this CPU), 23 verification items with 0 flagged, narration 38 s,
+slides 1.5 s, mux 18 s; a 122.7 s 1920x1080 H.264/AAC video reached `needs_review` 3 m 40 s
+after upload. Approve, release, and the package ZIP download then worked through the API.
+Earlier runs on the same box surfaced and fixed: the 180 s model timeout (now 600 s), scripts
+under 250 words (prompt now states the target), an allowed observation delta being called the
+total tax (verifier now feeds back into the retry loop), and the "tax year exactly once" rule
+(relaxed, Q36). Screenshots in `docs/screenshots/` come from this run.
 
 ## Deviations from the plan
 
