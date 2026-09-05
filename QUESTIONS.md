@@ -30,4 +30,5 @@ to keep building; they are not locked and can be reversed. Locked decisions live
 | Q33 | Invite links need somewhere to live without a new table. | Redis key `invite:<token>` with a 24 h TTL, single use. | 9 |
 | Q34 | On this Windows dev box (Docker Desktop VM) one Qwen3-8B script attempt exceeds 180 s. | Timeout is now a firm setting (default 600 s). The M6 is expected to be faster natively; measure there and lower it if warranted. | 9 |
 | Q35 | A fresh install with no key (or no reachable licensing server yet) was read-only from the first minute, which blocks evaluation and the first-run experience. | 14-day trial from the day the first user is created; after that, unlicensed means read-only. `LICENSE_ENFORCE=false` disables the gate for evaluation boxes. | 9 |
+| Q36 | PLAN §5a says the tax year "must appear in the script exactly once". The real model naturally says "your 2025 return" and "2025 estimated payments" in one script, and the rule adds no safety over the year being correct. | Relaxed to: the return's tax year must appear at least once and no other year may appear. The prompt still asks for it once. | 9 |
 

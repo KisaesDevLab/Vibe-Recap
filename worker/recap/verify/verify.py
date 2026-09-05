@@ -386,12 +386,13 @@ def verify(script: str, source_pdf: str, prior_pdf: str | None = None, profiles_
     else:
         n = years.count(str(facts.tax_year))
         others = [y for y in years if y != str(facts.tax_year)]
-        if n == 1 and not others:
+        # The return's year must be stated and no other year may appear (Q36 relaxes "exactly once").
+        if n >= 1 and not others:
             items.append(Item("tax_year", str(facts.tax_year), "verified", page=1, label="Form 1040 header"))
         elif n == 0:
             items.append(Item("tax_year", str(facts.tax_year), "flagged", reason="script never states the tax year"))
         else:
-            items.append(Item("tax_year", ", ".join(years), "flagged", reason="tax year must appear exactly once and no other year"))
+            items.append(Item("tax_year", ", ".join(dict.fromkeys(years)), "flagged", reason=f"script mentions a year other than {facts.tax_year}"))
 
     # -- filing status --------------------------------------------------------
     said = [code for code, phrases in STATUS_PHRASES.items() if _mentions(body, phrases)]
