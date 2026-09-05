@@ -57,7 +57,9 @@ total tax (verifier now feeds back into the retry loop), and the "tax year exact
   tests pass with Recap included. Not yet exercised on an appliance host.
 - Revision requests (Q40): `job_revisions` table, `POST /api/jobs/:id/revisions`, worker
   `revise()` in `script/generate.py`, `RevisionKept` restores the previous status on rejection,
-  "Ask for changes" panel on the job page.
+  "Ask for changes" panel on the job page. Exercised live on 2026-09-05 with qwen3:8b: the
+  revision applied in one attempt, re-verified (39 items, 0 flagged), re-narrated and re-muxed,
+  and the job returned to needs_review with a new script hash.
 
 ## Deviations from the plan
 
