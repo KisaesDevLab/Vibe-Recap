@@ -8,17 +8,24 @@ geometry:
   y_tolerance: 3          # points; words within this distance of a line's top belong to that line
   value_min_x: 360        # amounts sit to the right of this x (letter page is 612 wide)
   number_position: auto   # prefix | suffix | auto: where the IRS line number sits relative to its label
+  orphan_y_tolerance: 0   # >0: accept an amount printed on its own row this close to a multi-row label
 
 # Page classifiers (regex, case-insensitive). A page gets the first kind whose `any` matches
 # and none of whose `not` patterns match. `all` patterns must all match too.
+# Client copies contain letters, filing instructions, summaries, worksheets, and reports that
+# quote form names and line labels; the OMB number and the "Page 2" header keep those out.
 pages:
   comparison: { any: ['Two.Year Comparison', 'Tax Return Comparison', 'Comparison of .* Tax Returns'] }
-  form_2210: { any: ['Form 2210 \(', 'Underpayment of Estimated Tax'] }
-  schedule_1: { any: ['Schedule 1 \(Form 1040'] }
-  schedule_a: { any: ['Schedule A \(Form 1040'] }
-  f1040_1: { any: ['Form 1040 \(', 'Form 1040\b', '1040-SR'], all: ['Filing Status'], not: ['Schedule [1-3A] \(Form 1040'] }
-  f1040_2: { any: ['Form 1040 \(', 'Form 1040\b', '1040-SR'], all: ['total tax|Amount You Owe|Refund'], not: ['Filing Status', 'Schedule [1-3A] \(Form 1040'] }
-  state: { any: ['Individual Income Tax Return', 'Resident Income Tax', 'Income Tax Return'], not: ['U\.S\. Individual', 'Form 1040 \(', 'Comparison'] }
+  form_2210: { any: ['Form 2210 \(', 'Underpayment of Estimated Tax'], not: ['Worksheet', 'Report'] }
+  schedule_1: { any: ['Schedule 1 \(Form 1040'], all: ['OMB No\.? 1545-0074'] }
+  schedule_a: { any: ['Schedule A \(Form 1040'], all: ['OMB No\.? 1545-0074'] }
+  f1040_1: { any: ['Form 1040\b', 'U\.S\. Individual Income Tax Return', '1040-SR'], all: ['Filing Status', 'OMB No\.? 1545-0074'], not: ['Schedule [1-3A] \(Form 1040'] }
+  f1040_2: { any: ['Form 1040 \(20\d\d\)', 'Form 1040-SR \(20\d\d\)'], all: ['total tax|Amount You Owe|Refund', 'Page 2'], not: ['Filing Status', 'Schedule [1-3A] \(Form 1040', 'OMB No\.? 1545'] }
+  # The `not` list also ends a state form's page run (see detect_states). Title words are matched
+  # case-sensitively, `(?-i:...)`, because form instructions say "see worksheet" in running text.
+  state:
+    any: ['Individual Income Tax', 'Income Tax Return', 'Resident Income Tax', 'Tax Return']
+    not: ['U\.S\. Individual', 'Form 1040 \(', 'OMB No\.? 1545', 'Comparison', 'Return Summary', 'Filing Instructions', '(?-i:Worksheet)', '(?-i:Report\b)', '(?-i:Projection)', '(?-i:Dear )', '(?-i:Sincerely)', 'Signature Authorization', 'Estimated Tax Voucher', 'Payment Voucher']
 
 filing_status:
   S: 'Single'
@@ -36,6 +43,8 @@ required:
   - tax.total_tax
   - payments.total_payments
 
+# `line` accepts a list when the IRS renumbered a line between years: the 2025 form has 7a, 11a
+# (page 1) and 11b, 12e, 13a, 13b (page 2) where 2023 and 2024 had 7, 11, 12, 13.
 lines:
   - { path: income.wages, page: f1040_1, line: '1z', label: 'Add lines 1a through 1h|total wages' }
   - { path: income.interest, page: f1040_1, line: '2b', label: 'Taxable interest' }
@@ -43,41 +52,55 @@ lines:
   - { path: income.ira_pensions, page: f1040_1, line: '4b', label: 'Taxable amount', combine: sum }
   - { path: income.ira_pensions, page: f1040_1, line: '5b', label: 'Taxable amount', combine: sum }
   - { path: income.social_security_taxable, page: f1040_1, line: '6b', label: 'Taxable amount' }
-  - { path: income.capital_gain, page: f1040_1, line: '7', label: 'Capital gain' }
+  - { path: income.capital_gain, page: f1040_1, line: ['7a', '7'], label: 'Capital gain' }
   - { path: income.schedule_1_total, page: f1040_1, line: '8', label: 'Additional income' }
   - { path: income.total_income, page: f1040_1, line: '9', label: 'total income' }
   - { path: adjustments.schedule_1_adjustments, page: f1040_1, line: '10', label: 'Adjustments to income' }
-  - { path: adjustments.agi, page: f1040_1, line: '11', label: 'adjusted gross income' }
-  - { path: deductions.amount, page: f1040_2, line: '12', label: 'Standard deduction or itemized' }
-  - { path: deductions.qbi, page: f1040_2, line: '13', label: 'Qualified business income' }
+  - { path: adjustments.agi, page: f1040_1, line: ['11a', '11'], label: 'adjusted gross income' }
+  - { path: deductions.amount, page: f1040_2, line: ['12e', '12'], label: 'Standard deduction or itemized' }
+  - { path: deductions.qbi, page: f1040_2, line: ['13a', '13'], label: 'Qualified business income' }
+  - { path: deductions.additional, page: f1040_2, line: '13b', label: 'Additional deductions', required: false }
   - { path: deductions.taxable_income, page: f1040_2, line: '15', label: 'taxable income' }
   - { path: tax.tax, page: f1040_2, line: '16', label: '^Tax\b' }
   - { path: tax.schedule_2_total, page: f1040_2, line: '17', label: 'Schedule 2, line 3' }
   - { path: tax.nonrefundable_credits, page: f1040_2, line: '21', label: 'Add lines 19 and 20' }
   - { path: tax.other_taxes, page: f1040_2, line: '23', label: 'Other taxes' }
   - { path: tax.total_tax, page: f1040_2, line: '24', label: 'total tax' }
-  - { path: payments.withholding, page: f1040_2, line: '25d', label: 'withheld' }
+  - { path: payments.withholding, page: f1040_2, line: '25d', label: 'withheld|Add lines 25a through 25c' }
   - { path: payments.estimates, page: f1040_2, line: '26', label: 'estimated tax payments' }
-  - { path: payments.refundable_credits, page: f1040_2, line: '32', label: 'refundable credits' }
+  - { path: payments.refundable_credits, page: f1040_2, line: '32', label: 'refundable credits|total other payments' }
   - { path: payments.total_payments, page: f1040_2, line: '33', label: 'total payments' }
   - { path: result.refund, page: f1040_2, line: '35a', label: 'refunded to you' }
   - { path: result.applied_to_next_year, page: f1040_2, line: '36', label: 'applied to your .* estimated tax' }
   - { path: result.amount_owed, page: f1040_2, line: '37', label: 'amount you owe' }
-  - { path: extras.estimated_tax_penalty, page: f1040_2, line: '38', label: 'Estimated tax penalty', required: false }
+  # Line 38 is printed in the smaller box left of the main amount column, hence its own value zone.
+  - { path: extras.estimated_tax_penalty, page: f1040_2, line: '38', label: 'Estimated tax penalty', required: false, value_min_x: 380 }
   - { path: extras.itemized_total, page: schedule_a, line: '17', label: 'Total itemized deductions', required: false }
 
+# State lines are matched by label across every page of the state's form, first hit wins, so the
+# patterns rule out the federal figures that state forms restate ("Total tax from federal return",
+# "federal income tax withheld") and the payment lines that mention a prior overpayment.
 state:
   lines:
     - { path: taxable_income, label: 'taxable income' }
-    - { path: tax, label: 'income tax\b|\btax liability|^tax$|total tax' }
+    - { path: tax, label: '(?<!federal )income tax\b(?! withheld| return| deduction)|\btax liability|total tax(?! from federal)' }
     - { path: payments, label: 'total payments' }
-    - { path: refund, label: 'refund|overpayment|overpaid' }
+    - { path: refund, label: '\brefund\b(?! received)|(?<!include )\boverpayment\b|\boverpaid\b' }
     - { path: amount_owed, label: 'amount due|amount you owe|balance due|tax due' }
+    # Folded into the amount due on most state forms, like federal line 38; lets the state result foot.
+    - { path: penalty, label: 'underpayment of estimated tax penalty|estimated tax penalty|penalty and interest' }
 
+# Two-year comparison rows. Reports list several "taxable income" and "refund" rows; the patterns
+# pick the final ones. Values are taken from the prior-year column.
 comparison:
   rows:
     - { path: agi, label: 'adjusted gross income' }
-    - { path: taxable_income, label: 'taxable income' }
-    - { path: total_tax, label: 'total tax' }
-    - { path: refund, label: 'refund' }
-    - { path: amount_owed, label: 'amount owed|balance due|amount due|amount you owe' }
+    - { path: taxable_income, label: 'taxable income(?! before)' }
+    - { path: total_tax, label: 'total tax(?! from)' }
+    - { path: refund, label: 'refund received|^refund\b(?! applied)|\brefund$' }
+    - { path: amount_owed, label: 'amount owed|balance due|amount due|amount you owe|\btax due$' }
+    # Some reports print one signed row instead: positive is a balance due, negative a refund.
+    # Used only when neither of the rows above carried a value; the "net" row (after penalty, the
+    # figure that matches line 37) is preferred over the bare "tax due" row.
+    - { path: net, label: 'net tax due/-refund|net refund/-due|balance due/-refund', signed: true }
+    - { path: net, label: '^tax due/-refund', signed: true }

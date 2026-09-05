@@ -1,5 +1,10 @@
 # Form 1040 profile for ultratax. Overrides _base-1040.yaml.
 extends: _base-1040.yaml
 software: ultratax
-geometry: { y_tolerance: 6, value_min_x: 380 }
-notes: "Labels and values are separate text runs; the value baseline can sit a few points off the label, hence the wider y tolerance."
+geometry: { y_tolerance: 3, value_min_x: 500, orphan_y_tolerance: 10 }
+notes: >
+  Labels and values are separate text runs and the value baseline sits about 4 points above its
+  label, so values land on their own rows; orphan_y_tolerance attaches them (a wide y_tolerance
+  would instead glue a value to the row above it). The IRS line number is printed twice, as a
+  prefix and again at x~478 just left of the amount column, so the value zone starts at 500. For
+  multi-row labels (line 16 "Tax") the value aligns with the row carrying the second line number.

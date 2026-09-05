@@ -18,6 +18,8 @@ import yaml
 from .pdf import Word, page_words
 
 YEAR_RE = re.compile(r"\b(20[1-3]\d)\b")
+FORM_PAGE_RE = re.compile(r"U\.S\. Individual Income Tax Return", re.I)
+OMB_RE = re.compile(r"OMB No\.? 1545-0074", re.I)
 
 
 @dataclass
@@ -25,6 +27,7 @@ class Identification:
     software: str = "unknown"
     form: str | None = None
     tax_year: int | None = None
+    form_page: int | None = None  # 1-based page where the IRS form itself starts
     page_count: int = 0
     text_coverage: float = 0.0  # 0..1 share of pages with usable text
     first_name: str | None = None
@@ -131,19 +134,26 @@ def identify(pdf_path: str, profiles_dir: str | None = None, max_pages: int = 3)
         ident.page_count = len(pdf.pages)
         texts: list[str] = []
         empty: list[int] = []
+        form_idx: int | None = None
         for i, page in enumerate(pdf.pages):
             t = page.extract_text() or ""
+            texts.append(t)
             if len(t.strip()) < 40:
                 empty.append(i + 1)
-            if i < max_pages:
-                texts.append(t)
+            # Client copies open with letters, invoices, and summaries; the return itself can start
+            # a dozen pages in. The form page is the one with the IRS title and its OMB number.
+            if form_idx is None and FORM_PAGE_RE.search(t) and OMB_RE.search(t):
+                form_idx = i
         ident.pages_without_text = empty
         ident.text_coverage = round(1 - len(empty) / max(1, ident.page_count), 3)
-        head = "\n".join(texts)
-        ident.software = detect_software(head, sigs.get("software", {}))
-        ident.form = detect_form(head, sigs.get("form", {}))
-        ident.tax_year = detect_tax_year(head)
+        head = "\n".join(texts[:max_pages])
+        form_text = texts[form_idx] if form_idx is not None else ""
+        ident.form_page = form_idx + 1 if form_idx is not None else None
+        # Vendor signatures can sit anywhere: a footer code, a report title, a cover page.
+        ident.software = detect_software("\n".join(texts), sigs.get("software", {}))
+        ident.form = detect_form(form_text or head, sigs.get("form", {}))
+        ident.tax_year = detect_tax_year(form_text or head)
         if pdf.pages:
-            words = page_words(pdf.pages[0])
+            words = page_words(pdf.pages[form_idx if form_idx is not None else 0])
             ident.first_name, ident.last_name, ident.spouse_first_name = find_names(words)
     return ident

@@ -219,6 +219,7 @@ def expected_json(case: Case, software: str) -> dict:
         "adjustments": {"schedule_1_adjustments": case.schedule_1_adjustments, "agi": case.agi},
         "deductions": {
             "type": case.deduction_type,
+            "additional": 0,
             "amount": case.deduction_amount,
             "qbi": case.qbi,
             "taxable_income": case.taxable_income,
@@ -466,6 +467,7 @@ def draw_page1(L: Layout, case: Case, page: int, total: int):
     L.header(f"Form 1040 ({case.tax_year})", y, 13)
     c.setFont("Helvetica", 9)
     c.drawString(200, y, "U.S. Individual Income Tax Return")
+    c.drawString(380, y, "OMB No. 1545-0074")
     c.drawRightString(PAGE_W - 54, y, f"Tax year {case.tax_year}")
     y -= 30
     # Name block: labels above values, as on the IRS form.
@@ -518,11 +520,11 @@ def draw_page1(L: Layout, case: Case, page: int, total: int):
         ("5b", "Taxable amount", case.pensions),
         ("6a", "Social security benefits", case.social_security_taxable),
         ("6b", "Taxable amount", case.social_security_taxable),
-        ("7", "Capital gain or (loss)", case.capital_gain),
+        ("7a", "Capital gain or (loss). Attach Schedule D if required", case.capital_gain),
         ("8", "Additional income from Schedule 1, line 10", case.schedule_1_total),
-        ("9", "Add lines 1z, 2b, 3b, 4b, 5b, 6b, 7, and 8. This is your total income", case.total_income),
+        ("9", "Add lines 1z, 2b, 3b, 4b, 5b, 6b, 7a, and 8. This is your total income", case.total_income),
         ("10", "Adjustments to income from Schedule 1, line 26", case.schedule_1_adjustments),
-        ("11", "Subtract line 10 from line 9. This is your adjusted gross income", case.agi),
+        ("11a", "Subtract line 10 from line 9. This is your adjusted gross income", case.agi),
     ]
     for num, text, amt in rows:
         L.line(y, num, text, amt)
@@ -535,16 +537,19 @@ def draw_page2(L: Layout, case: Case, page: int, total: int):
     y = PAGE_H - 60
     L.header(f"Form 1040 ({case.tax_year})", y, 11)
     c.setFont("Helvetica", 8)
-    c.drawRightString(PAGE_W - 54, y, f"{case.first_name} {case.last_name}  {case.ssn}")
+    c.drawString(300, y, f"{case.first_name} {case.last_name}  {case.ssn}")
+    c.drawRightString(PAGE_W - 54, y, "Page 2")
     y -= 26
     L.header("Tax and Credits", y, 10)
     y -= L.line_h
     ded_label = "Standard deduction or itemized deductions (from Schedule A)"
     rows = [
-        ("12", ded_label, case.deduction_amount),
-        ("13", "Qualified business income deduction from Form 8995 or Form 8995-A", case.qbi),
-        ("14", "Add lines 12 and 13", case.deduction_amount + case.qbi),
-        ("15", "Subtract line 14 from line 11. This is your taxable income", case.taxable_income),
+        ("11b", "Amount from line 11a (adjusted gross income)", case.agi),
+        ("12e", ded_label, case.deduction_amount),
+        ("13a", "Qualified business income deduction from Form 8995 or Form 8995-A", case.qbi),
+        ("13b", "Additional deductions from Schedule 1-A, line 38", 0),
+        ("14", "Add lines 12e, 13a, and 13b", case.deduction_amount + case.qbi),
+        ("15", "Subtract line 14 from line 11b. This is your taxable income", case.taxable_income),
         ("16", "Tax", case.tax),
         ("17", "Amount from Schedule 2, line 3", case.schedule_2_total),
         ("18", "Add lines 16 and 17", case.tax + case.schedule_2_total),
@@ -564,11 +569,11 @@ def draw_page2(L: Layout, case: Case, page: int, total: int):
     rows = [
         ("25d", "Federal income tax withheld", case.withholding),
         ("26", f"{case.tax_year} estimated tax payments and amount applied from {case.tax_year - 1} return", case.estimates),
-        ("27", "Earned income credit (EIC)", 0),
+        ("27a", "Earned income credit (EIC)", 0),
         ("28", "Additional child tax credit from Schedule 8812", case.refundable_credits),
         ("29", "American opportunity credit from Form 8863, line 8", 0),
         ("31", "Amount from Schedule 3, line 15", 0),
-        ("32", "Add lines 27, 28, 29, and 31. These are your total other payments and refundable credits", case.refundable_credits),
+        ("32", "Add lines 27a, 28, 29, 30, and 31. These are your total other payments and refundable credits", case.refundable_credits),
         ("33", "Add lines 25d, 26, and 32. These are your total payments", case.total_payments),
     ]
     for num, text, amt in rows:
@@ -604,6 +609,8 @@ def draw_page2(L: Layout, case: Case, page: int, total: int):
 def draw_schedule1(L: Layout, case: Case, page: int, total: int):
     y = PAGE_H - 60
     L.header(f"Schedule 1 (Form 1040) {case.tax_year}", y, 12)
+    L.c.setFont("Helvetica", 9)
+    L.c.drawString(300, y, "Additional Income and Adjustments to Income   OMB No. 1545-0074")
     y -= 26
     L.header("Part I  Additional Income", y, 10)
     y -= L.line_h
@@ -623,7 +630,7 @@ def draw_schedule_a(L: Layout, case: Case, page: int, total: int):
     y = PAGE_H - 60
     L.header(f"Schedule A (Form 1040) {case.tax_year}", y, 12)
     L.c.setFont("Helvetica", 9)
-    L.c.drawString(230, y, "Itemized Deductions")
+    L.c.drawString(230, y, "Itemized Deductions   OMB No. 1545-0074")
     y -= 26
     taxes = min(10_000, case.deduction_amount // 2)
     interest = case.deduction_amount - taxes - 1_500

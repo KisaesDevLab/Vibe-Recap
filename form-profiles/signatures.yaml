@@ -1,9 +1,14 @@
-# Software detection signatures. Matched case-insensitively against the text of the
-# first three pages. First match wins; order is most-specific first. Edit without code changes.
+# Software detection signatures. Matched case-insensitively against the text of the whole
+# package (client copies bury the vendor marks in footers and report titles). First match wins;
+# order is most-specific first. Form and year come from the IRS form page, not from cover letters.
 software:
   ultratax:
     - "UltraTax CS"
     - "UltraTax"
+    # UltraTax client copies never print the product name; these are its report titles.
+    - "Federal Return Summary"
+    - "Two Year Comparison Report"
+    - "Tax Return History Report"
   lacerte:
     - "Lacerte"
   cch:

@@ -55,6 +55,9 @@ total tax (verifier now feeds back into the retry loop), and the "tax year exact
 - Vibe Appliance packaging lives in `.appliance/` (Q38) and was applied to the Vibe-Appliance
   repo (manifest, overlay, env template, emergency port 5183, preflight list); its 34 manifest
   tests pass with Recap included. Not yet exercised on an appliance host.
+- Real returns (Q43): two UltraTax 2025 client copies extract, reconcile and verify on the dev box
+  (federal, Missouri, prior-year column, penalties). The other five vendor profiles remain
+  validated on synthetic fixtures only; real samples are the next thing to ask for.
 - Revision requests (Q40): `job_revisions` table, `POST /api/jobs/:id/revisions`, worker
   `revise()` in `script/generate.py`, `RevisionKept` restores the previous status on rejection,
   "Ask for changes" panel on the job page. Exercised live on 2026-09-05 with qwen3:8b: the

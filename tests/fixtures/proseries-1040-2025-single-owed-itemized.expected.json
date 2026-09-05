@@ -27,6 +27,7 @@
   },
   "deductions": {
     "type": "itemized",
+    "additional": 0,
     "amount": 21400,
     "qbi": 1800,
     "taxable_income": 84110

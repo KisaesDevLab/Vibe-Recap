@@ -60,6 +60,9 @@ LABELED_PHRASES = [
 ]
 
 # Where the coverage figures live on Form 1040, by label (independent of the profiles).
+# Page types that quote state names and form labels without being the return itself.
+_NON_FORM_PAGE = re.compile(r"Return Summary|Filing Instructions|Worksheet|Report|Projection|Comparison|\bDear |Sincerely|Signature Authorization|Estimated Tax Voucher|Payment Voucher")
+
 LINE_LABELS = {
     "total_income": r"total income",
     "agi": r"adjusted gross income",
@@ -133,11 +136,22 @@ def _first_line_amount(pages: list[VPage], label_re: str, kinds: tuple[str, ...]
     for p in pages:
         if page_kind(p) not in kinds:
             continue
-        for ln in p.lines:
-            if re.search(label_re, ln.text, re.I):
-                v = rightmost_amount(ln, parse_amount)
-                if v is not None:
-                    return v, p.number, ln.text[:80]
+        for i, ln in enumerate(p.lines):
+            if not re.search(label_re, ln.text, re.I):
+                continue
+            v = rightmost_amount(ln, parse_amount)
+            if v is not None:
+                return v, p.number, ln.text[:80]
+            # A two-row label ("37 ... amount you owe. / For details on how to pay ... 37  11,197"):
+            # the amount sits on the continuation row that repeats the line number at the right.
+            number = next((w.text for w in sorted(ln.words, key=lambda w: w.x0) if re.fullmatch(r"\d{1,2}[a-z]?", w.text)), None)
+            if number:
+                for nxt in p.lines[i + 1 : i + 3]:
+                    if any(w.text == number and w.x0 >= 400 for w in nxt.words):
+                        v = rightmost_amount(nxt, parse_amount)
+                        if v is not None:
+                            return v, p.number, ln.text[:80]
+                        break
     return None
 
 
@@ -178,19 +192,30 @@ def read_return(pages: list[VPage], prior_pages: list[VPage] | None, profiles_di
                     f.address_line = " ".join(w.text for w in sorted(band, key=lambda w: w.x0))
         f.filing_status = _filing_status(p1)
     f.itemized = any(page_kind(p) == "schedule_a" for p in pages)
-    # states
+    # states: a state form starts on a non-federal page whose header names the state or its form id
+    # and continues over following unclassified pages that still mention the state. Letters, filing
+    # instructions, summaries, worksheets and reports never count, whatever they mention.
+    state_of_page: dict[int, str] = {}
     if profiles_dir and Path(profiles_dir, "states.yaml").exists():
         with open(Path(profiles_dir, "states.yaml"), encoding="utf-8") as fh:
             states = yaml.safe_load(fh)["states"]
+        current: str | None = None
         for p in pages:
-            if page_kind(p) != "state":
+            kind = page_kind(p)
+            head = "\n".join(ln.text for ln in p.lines[:10])
+            if kind not in ("state", "other") or _NON_FORM_PAGE.search(head) or "omb no. 1545" in p.text.lower():
+                current = None
                 continue
-            head = "\n".join(ln.text for ln in p.lines[:5])
-            for code, needles in states.items():
-                if any(re.search(rf"\b{re.escape(n)}\b", head, re.I) for n in needles):
-                    if code not in f.states:
-                        f.states.append(code)
-                    break
+            code = next((c for c, needles in states.items() if any(re.search(rf"\b{re.escape(n)}\b", head, re.I) for n in needles)), None)
+            if code is None and current and re.search(rf"\b{re.escape(states[current][0])}\b", p.text, re.I):
+                code = current
+            if code is None:
+                current = None
+                continue
+            current = code
+            state_of_page[p.number] = code
+            if code not in f.states:
+                f.states.append(code)
     # key lines
     for key, label in LINE_LABELS.items():
         hit = _first_line_amount(pages, label)
@@ -208,26 +233,61 @@ def read_return(pages: list[VPage], prior_pages: list[VPage] | None, profiles_di
                 f.prior[key] = hit[0]
         f.prior["source"] = 1  # marker only
     else:
-        cmp_page = next((p for p in pages if page_kind(p) == "comparison"), None)
-        if cmp_page and f.tax_year:
-            col_x = None
-            for ln in cmp_page.lines:
+        # The federal comparison may span two consecutive pages; a state or schedule comparison
+        # printed elsewhere never joins it.
+        cmp_pages: list[VPage] = []
+        for p in pages:
+            if page_kind(p) == "comparison" and (not cmp_pages or p.number == cmp_pages[-1].number + 1):
+                cmp_pages.append(p)
+            elif cmp_pages:
+                break
+        col_x = None
+        if cmp_pages and f.tax_year:
+            # The column header is a short row of years; a report title naming both years is not it.
+            for ln in cmp_pages[0].lines:
                 ys = [w for w in ln.words if w.text in (str(f.tax_year - 1), str(f.tax_year))]
-                if len(ys) >= 2:
+                if len(ys) >= 2 and len(ln.words) <= 4:
                     col_x = next(w.x0 for w in ys if w.text == str(f.tax_year - 1))
                     break
-            if col_x is not None:
-                for key, label in (("agi", "adjusted gross income"), ("total_tax", "total tax"), ("refund", r"^refund"), ("amount_owed", "amount owed")):
-                    for ln in cmp_page.lines:
+        if col_x is not None:
+            labels = (
+                ("agi", r"adjusted gross income"),
+                ("total_tax", r"total tax(?! from)"),
+                ("refund", r"refund received|^refund\b(?! applied)|\brefund$"),
+                ("amount_owed", r"amount owed|balance due|amount due|amount you owe|\btax due$"),
+                ("_net", r"net tax due/-refund|net refund/-due|balance due/-refund"),
+                ("_net2", r"^tax due/-refund"),
+            )
+            # Rows without a printed amount (a blank line in a report) are skipped, not treated as
+            # the answer: a later row with the same label and a value wins.
+            for key, label in labels:
+                done = False
+                for cp in cmp_pages:
+                    for ln in cp.lines:
                         lab = " ".join(w.text for w in ln.words if parse_amount(w.text) is None or not any(c.isdigit() for c in w.text))
-                        if re.search(label, lab, re.I):
-                            nums = [w for w in ln.words if parse_amount(w.text) is not None and any(c.isdigit() for c in w.text)]
-                            if nums:
-                                near = min(nums, key=lambda w: abs((w.x0 + w.x1) / 2 - col_x - 10))
-                                v = parse_amount(near.text)
-                                if v is not None:
-                                    f.prior[key] = v
+                        lab = re.sub(r"^\s*\d{1,2}[a-z]?\.\s*", "", lab)  # "70. Refund received" -> "Refund received"
+                        if not re.search(label, lab, re.I):
+                            continue
+                        nums = [w for w in ln.words if parse_amount(w.text) is not None and any(c.isdigit() for c in w.text) and not re.fullmatch(r"\d{1,2}[a-z]?\.", w.text)]
+                        if not nums:
+                            continue
+                        near = min(nums, key=lambda w: abs((w.x0 + w.x1) / 2 - col_x - 10))
+                        v = parse_amount(near.text)
+                        if v is not None:
+                            f.prior[key] = abs(v) if key in ("refund", "amount_owed") else v
+                            done = True
                             break
+                    if done:
+                        break
+            # A single signed "net tax due/-refund" row stands in when the report has no separate rows.
+            net2 = f.prior.pop("_net2", None)
+            net = f.prior.pop("_net", None)
+            net = net if net is not None else net2
+            if net is not None and "refund" not in f.prior and "amount_owed" not in f.prior:
+                if net > 0:
+                    f.prior["amount_owed"] = net
+                elif net < 0:
+                    f.prior["refund"] = -net
     # amount index across every page: value -> (page, label)
     for p in pages:
         for ln in p.lines:
@@ -239,7 +299,7 @@ def read_return(pages: list[VPage], prior_pages: list[VPage] | None, profiles_di
                     continue
                 label = " ".join(x.text for x in ln.words if x is not w)[:80]
                 f.amount_index.setdefault(abs(v), []).append((p.number, label))
-                if page_kind(p) == "state":
+                if p.number in state_of_page:
                     f.state_amounts.add(abs(v))
     return f
 
@@ -254,6 +314,7 @@ def _load_states(profiles_dir: str | None) -> dict[str, list[str]]:
 def _filing_status(p1: VPage) -> str | None:
     present: list[str] = []
     marked: list[str] = []
+    allw = [w for ln in p1.lines for w in ln.words]
     for code, pat in STATUS_LABELS.items():
         for alt in pat.split("|"):
             for ln in p1.lines:
@@ -264,6 +325,11 @@ def _filing_status(p1: VPage) -> str | None:
                 present.append(code)
                 before = " ".join(w.text for w in words[max(0, i - 3) : i] if words[i].x0 - w.x1 < 40)
                 if re.search(r"\[\s*[xX✓☒]\s*\]\s*$", before) or (re.search(r"(^|\s)[xX✓☒](\s|$)", before) and not re.search(r"\[\s*\]\s*$", before)):
+                    marked.append(code)
+                    break
+                # The mark can be its own text object on a slightly different baseline (UltraTax).
+                anchor = words[i]
+                if any(re.fullmatch(r"[xX✓☒]", w.text) and 0 <= anchor.x0 - w.x1 < 40 and abs(w.top - anchor.top) <= 6 for w in allw):
                     marked.append(code)
                 break
             if code in present:

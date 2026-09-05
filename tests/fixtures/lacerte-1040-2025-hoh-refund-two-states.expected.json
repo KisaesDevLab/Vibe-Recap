@@ -30,6 +30,7 @@
   },
   "deductions": {
     "type": "standard",
+    "additional": 0,
     "amount": 22500,
     "qbi": 0,
     "taxable_income": 49305
