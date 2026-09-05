@@ -62,10 +62,16 @@ def rasterize(pdf_path: str, page_numbers: list[int], dpi: int = DPI) -> dict[in
         for n in page_numbers:
             page = doc[n - 1]
             bitmap = page.render(scale=dpi / 72)
-            img = bitmap.to_pil()
-            buf = io.BytesIO()
-            img.save(buf, format="PNG")
-            out[n] = buf.getvalue()
+            try:
+                img = bitmap.to_pil()
+                buf = io.BytesIO()
+                img.save(buf, format="PNG")
+                out[n] = buf.getvalue()
+            finally:
+                # Close children deterministically: a page left to the garbage collector can
+                # finalize while doc.close() iterates its children ("Set changed size during iteration").
+                bitmap.close()
+                page.close()
     finally:
         doc.close()
     return out
@@ -128,7 +134,11 @@ def lines_to_text_layer(pdf_path: str, page_lines: dict[int, list[OcrLine]], out
 
     src = pdfium.PdfDocument(pdf_path)
     try:
-        sizes = [(src[i].get_width(), src[i].get_height()) for i in range(len(src))]
+        sizes = []
+        for i in range(len(src)):
+            page = src[i]
+            sizes.append((page.get_width(), page.get_height()))
+            page.close()  # see rasterize(): never leave pages to the garbage collector
     finally:
         src.close()
     overlay_path = str(Path(out_path).with_suffix(".overlay.pdf"))
