@@ -112,8 +112,10 @@ preparer's note are sent; the return PDF never leaves the box.
    as `VIBE_AI_TOKEN`.
 2. The router lives on the Docker network `vibe_net`. On the Vibe Appliance it already exists;
    on a standalone host run `docker network create vibe_net` once and start the router stack on it.
-3. Start Recap. The API registers the task class `recap_script`, which begins `local_only`.
-   Widen it in the router console (Policies) to allow the cloud models you want.
+3. Start Recap. The API registers the task class `recap_script`, which begins `local_only` with
+   no model bound. In the router console (Policies) bind a model to it and, if you want cloud
+   models, widen its sensitivity. Until a model is bound, script jobs fail with a clear
+   "policy_blocked" message naming this step.
 4. Settings > General > *Test connections* shows the router state and the class's sensitivity.
 
 Without a token, or with *Bundled Ollama* selected, scripts are generated locally by `qwen3:8b`.

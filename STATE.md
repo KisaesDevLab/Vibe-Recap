@@ -44,6 +44,11 @@ total tax (verifier now feeds back into the retry loop), and the "tax year exact
   worker reaches the router only through a socat relay so it never joins a network with an
   internet route. `recap_script` is registered by the API at startup.
 - Licensing is informational until the server exists (`LICENSE_ENFORCE=false`, Q35).
+- Verified against the real Vibe-AI-Router dev server (0.0.27) on this box: admin login, app
+  token mint, `POST /v1/task-classes/register` (created `recap_script`, `local_only`), and a
+  completion that returned `policy_blocked` with Recap's operator message, which is the expected
+  state until an admin binds a model to the class. A served completion needs a bound model
+  (router console > Policies); not exercised here.
 - Vibe Appliance packaging lives in `.appliance/` (Q38); the two appliance-repo edits it needs
   are listed there. Not yet exercised on an appliance host.
 
