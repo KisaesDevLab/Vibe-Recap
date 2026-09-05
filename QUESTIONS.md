@@ -21,4 +21,6 @@ to keep building; they are not locked and can be reversed. Locked decisions live
 | Q24 | Kokoro model files (325 MB + 28 MB) must be inside the worker image because the worker has no internet. | Baked in at build time from the kokoro-onnx release; the `worker_models` volume was removed so the baked files are never hidden by an empty volume. | 6 |
 | Q25 | Passkeys (WebAuthn) and TOTP are optional Phase 6 deliverables. | Deferred to v1.1 per Q8; the settings/users page shows their status column as "not enabled". Session cookies plus Argon2id remain the v1 login. | 6 |
 | Q26 | Which roles may preview a video before release? | preparer/admin at any stage after render; staff once approved; viewer once released. Every preview is an audited `file.read`. | 6 |
+| Q27 | Download file names come from the client name, which is PII in the firm's own filesystem. | Kept: `<Last-First>-<year>-recap.zip` is what a preparer needs to attach to the right client's delivery; the name never leaves the firm. Punctuation is stripped. | 7 |
+| Q28 | May staff download approved-but-unreleased deliverables? | No. PLAN §6 says staff download after release; preparers and admins may download at any stage after render to review. Viewers only after release. | 7 |
 

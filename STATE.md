@@ -12,7 +12,7 @@ Updated by Claude Code at the end of each phase. Read after CLAUDE.md, docs/PLAN
 | 4 OCR fallback | done 2026-09-05 | rasterize + Ollama OCR + invisible text-layer overlay; 90 s per-page cap; tested with a stand-in OCR engine, not yet against real GLM-OCR |
 | 5 Script, validator, verifier | done 2026-09-05 | prompt + Ollama client + 3-attempt loop, Python validator with TS mirror, independent verifier (own PDF pass) with page/label evidence; golden scripts pass on all 6 layouts; script editor + verification panel |
 | 6 Render, review, approval | done 2026-09-05 | Kokoro per-sentence narration, Jinja/Playwright slides, ffmpeg xfade mux, VTT/TXT; approve with three-hash snapshot, reject, re-render, bulk approve; whole-pipeline test produces an MP4. Passkeys/TOTP deferred (Q25) |
-| 7 Release and download | not started | |
+| 7 Release and download | done 2026-09-05 | release, role/state-gated downloads with one audit row each, package ZIP, batch release-all and download-all (ZIP of ZIPs), delivered checkbox, dashboard filters |
 | 8 Retention and purge | not started | |
 | 9 Users, audit UI, licensing, backup, docs | not started | |
 

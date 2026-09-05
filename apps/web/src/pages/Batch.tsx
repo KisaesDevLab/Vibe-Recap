@@ -23,7 +23,23 @@ export function BatchPage() {
   const done = jobs.filter((j) => ["needs_review", "approved", "released", "purged", "failed", "rejected"].includes(j.status)).length;
   const failed = jobs.filter((j) => j.status === "failed");
   const reviewable = jobs.filter((j) => j.status === "needs_review");
+  const approvedCount = jobs.filter((j) => j.status === "approved").length;
+  const releasedCount = jobs.filter((j) => j.status === "released").length;
   const pct = total ? Math.round((done / total) * 100) : 0;
+
+  async function releaseApproved() {
+    setBusy(true);
+    setMsg(null);
+    try {
+      const r = await post<{ released: string[] }>(`/api/batches/${data!.id}/release-approved`);
+      setMsg(`Released ${r.released.length} job(s).`);
+      await reload();
+    } catch (err) {
+      setMsg(err instanceof ApiError ? err.message : "Release failed");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function approveVerified() {
     setBusy(true);
@@ -67,6 +83,16 @@ export function BatchPage() {
               <Button size="sm" onClick={approveVerified} disabled={busy} title="Approves every job in review with zero verification flags and no recon exceptions; each approval is audited">
                 Approve all verified ({reviewable.length})
               </Button>
+            )}
+            {approvedCount > 0 && can("preparer") && (
+              <Button size="sm" onClick={releaseApproved} disabled={busy}>
+                Release all approved ({approvedCount})
+              </Button>
+            )}
+            {releasedCount > 0 && (
+              <a href={`/api/batches/${data.id}/released.zip`} className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-1 text-sm font-medium hover:bg-slate-50">
+                Download all released ({releasedCount})
+              </a>
             )}
           </>
         }

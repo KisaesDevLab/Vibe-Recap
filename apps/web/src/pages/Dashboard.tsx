@@ -1,5 +1,6 @@
+import { useState } from "react";
 import { Link } from "react-router";
-import type { DashboardDto } from "@vibe-recap/shared";
+import type { DashboardDto, JobSummaryDto } from "@vibe-recap/shared";
 import { useApi } from "../lib/useApi";
 import { useAuth } from "../lib/auth";
 import { fmtDate } from "../lib/format";
@@ -9,6 +10,8 @@ import { Alert, Button, Card, PageTitle, Spinner } from "../ui";
 export function DashboardPage() {
   const { can } = useAuth();
   const { data, error, loading } = useApi<DashboardDto>("/api/dashboard", 5000);
+  const [filter, setFilter] = useState<string | null>(null);
+  const filtered = useApi<{ jobs: JobSummaryDto[] }>(filter ? `/api/jobs?status=${filter}&limit=200` : null, 10000);
   if (loading && !data) return <Spinner />;
   if (error || !data) return <Alert kind="error">{error ?? "Could not load dashboard"}</Alert>;
   return (
@@ -47,6 +50,33 @@ export function DashboardPage() {
               </Link>
             );
           })}
+        </div>
+      )}
+      <div className="mb-4 flex flex-wrap items-center gap-2 text-sm">
+        <span className="text-slate-500">Filter:</span>
+        {(
+          [
+            ["needs_review", "Needs review"],
+            ["approved", "Approved, not released"],
+            ["released", "Released"],
+            ["failed", "Failed"],
+          ] as const
+        ).map(([status, label]) => (
+          <button
+            key={status}
+            type="button"
+            onClick={() => setFilter(filter === status ? null : status)}
+            className={`rounded-full border px-3 py-1 ${filter === status ? "border-brand bg-brand text-white" : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"}`}
+          >
+            {label} {data.counts[status] ? `(${data.counts[status]})` : ""}
+          </button>
+        ))}
+      </div>
+      {filter && (
+        <div className="mb-4">
+          <Card title={filter === "released" ? "Released (last 7 days first)" : `Filtered: ${filter.replace("_", " ")}`}>
+            {filtered.loading && !filtered.data ? <Spinner /> : <JobTable jobs={filtered.data?.jobs ?? []} empty="Nothing here." />}
+          </Card>
         </div>
       )}
       <div className="grid gap-4 lg:grid-cols-2">

@@ -1,9 +1,32 @@
 import { useState } from "react";
 import type { JobDetailDto } from "@vibe-recap/shared";
 import { useApi } from "../lib/useApi";
-import { ApiError, post } from "../lib/api";
+import { ApiError, patch, post } from "../lib/api";
 import { useAuth } from "../lib/auth";
-import { Alert, Badge, Button, Card, Textarea } from "../ui";
+import { Alert, Badge, Button, Card, Input, Textarea } from "../ui";
+
+function DeliveredBox({ job, onChanged }: { job: JobDetailDto; onChanged: () => void }) {
+  const [note, setNote] = useState(job.deliveredNote ?? "");
+  const [busy, setBusy] = useState(false);
+  async function save(delivered: boolean) {
+    setBusy(true);
+    try {
+      await patch(`/api/jobs/${job.id}/delivered`, { delivered, note: note || null });
+      onChanged();
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-2 rounded-md border border-slate-200 bg-slate-50 p-2 text-sm">
+      <label className="flex items-center gap-2">
+        <input type="checkbox" checked={job.delivered} disabled={busy} onChange={(e) => save(e.target.checked)} /> Delivered to client
+      </label>
+      <Input className="max-w-xs" placeholder="e.g. sent via portal 9/12" value={note} onChange={(e) => setNote(e.target.value)} onBlur={() => job.delivered && save(true)} />
+      <span className="text-xs text-slate-500">Your own tracking note; recorded in the audit log.</span>
+    </div>
+  );
+}
 
 export function VideoPanel({ job, onChanged }: { job: JobDetailDto; onChanged: () => void }) {
   const { user, can } = useAuth();
@@ -58,6 +81,11 @@ export function VideoPanel({ job, onChanged }: { job: JobDetailDto; onChanged: (
                 Approve
               </Button>
             )}
+            {job.status === "approved" && (
+              <Button size="sm" disabled={busy} onClick={() => act(`/api/jobs/${job.id}/release`, undefined, "Released. Download the package and send it through your usual channel.")}>
+                Release
+              </Button>
+            )}
           </>
         ) : undefined
       }
@@ -109,6 +137,26 @@ export function VideoPanel({ job, onChanged }: { job: JobDetailDto; onChanged: (
             </a>
             {job.reconExceptionCount ? <Badge tone="amber">recon exception on this job</Badge> : null}
           </div>
+          {(job.status === "released" || (can("preparer") && job.status === "approved")) && (
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+              <a href={`/api/jobs/${job.id}/package.zip`} className="inline-flex rounded-md bg-brand px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-strong">
+                Download package (MP4 + captions + transcript)
+              </a>
+              <a href={`/api/jobs/${job.id}/download/mp4`} className="text-brand hover:underline">MP4</a>
+              <a href={`/api/jobs/${job.id}/download/vtt`} className="text-brand hover:underline">VTT</a>
+              <a href={`/api/jobs/${job.id}/download/txt`} className="text-brand hover:underline">TXT</a>
+              {can("preparer") && (
+                <>
+                  <a href={`/api/jobs/${job.id}/download/extraction`} className="text-slate-500 hover:underline">extraction.json</a>
+                  <a href={`/api/jobs/${job.id}/download/verification`} className="text-slate-500 hover:underline">verification.json</a>
+                  <a href={`/api/jobs/${job.id}/download/source`} className="text-slate-500 hover:underline">source PDF</a>
+                </>
+              )}
+            </div>
+          )}
+          {job.status === "released" && can("staff") && (
+            <DeliveredBox job={job} onChanged={onChanged} />
+          )}
         </div>
       )}
     </Card>
