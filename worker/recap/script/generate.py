@@ -148,6 +148,7 @@ def render_prompt(section: str, ex: dict[str, Any], settings: dict[str, Any], no
         observation_facts=build_observation_facts(ex),
         preparer_note=(note or "").strip() or None,
         signoff_sentence=settings.get("signoff_sentence") or "We look forward to reviewing this with you.",
+        target_words=int(settings.get("target_words") or 350),
     ).strip()
 
 
@@ -171,7 +172,9 @@ def generate(ex: dict[str, Any], settings: dict[str, Any], note: str | None, cli
         last_errors = v.errors
         messages.append({"role": "assistant", "content": script})
         messages.append({"role": "user", "content": format_errors_for_model(v)})
-    raise ValueError("validator rejected the script after 3 attempts: " + "; ".join(last_errors[:5]))
+    err = ValueError("validator rejected the script after 3 attempts: " + "; ".join(last_errors[:5]))
+    err.attempts = attempts  # type: ignore[attr-defined]
+    raise err
 
 
 # ---------------------------------------------------------------------------
@@ -200,6 +203,9 @@ def generate_script(ctx: Any) -> None:
     except OllamaError as exc:
         raise StepFailed("script", str(exc)) from exc
     except ValueError as exc:
+        attempts = getattr(exc, "attempts", None)
+        if attempts:
+            ctx.db.add_event(ctx.job_id, "processing", "script", "all attempts rejected by the validator", {"attempts": attempts})
         raise StepFailed("script", str(exc)) from exc
     ctx.script = script
     sha = replace_file(ctx, "script", script.encode("utf-8"))

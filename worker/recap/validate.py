@@ -187,4 +187,9 @@ def format_errors_for_model(result: ValidationResult) -> str:
     lines = ["The script was rejected by the validator. Fix every point below and return the full script again:"]
     for e in result.errors:
         lines.append(f"- {e}")
+    if any(e.startswith("too short") for e in result.errors):
+        lines.append(
+            "To lengthen it: give every section 3 or 4 full sentences, explain what each figure means for the client, "
+            "and keep every number exactly as it is. Do not add new numbers."
+        )
     return "\n".join(lines)
