@@ -71,7 +71,7 @@ baked into the worker image for production.
 | `apps/web` | React 19 + Vite + Tailwind UI |
 | `worker` | Python pipeline: extraction, reconciliation, script, validator, verifier, narration, slides, video |
 | `packages/shared` | Types and the script validator mirror shared by web and api |
-| `form-profiles` | YAML line maps per software, seeded onto the data volume at first start |
+| `form-profiles` | YAML line maps per software, reconciled onto the data volume at each worker start (local edits kept) |
 | `tests/fixtures` | Synthetic returns with expected extractions and golden scripts. Never real returns. |
 | `docs` | [PLAN](docs/PLAN.md), [PHASES](docs/PHASES.md), [INSTALL](docs/INSTALL.md) |
 | `STATE.md`, `QUESTIONS.md` | Build status and the decisions taken along the way |

@@ -149,7 +149,10 @@ docker compose up -d
 ```
 
 Database migrations run automatically when the API starts. Form profiles under
-`data/form-profiles` are yours and are never overwritten by an update.
+`data/form-profiles` are reconciled with the image at every worker start: a profile you have not
+edited is replaced by the newer version the image ships; one you have edited is kept, and the
+worker log names it so you can merge the change by hand (`.seeded/` holds what the image last
+installed).
 
 ## 9. Backups
 
