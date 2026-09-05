@@ -105,7 +105,7 @@ def word_count(script: str) -> int:
 
 def _pct_matches(value: float, allowed: set[float]) -> bool:
     for a in allowed:
-        if abs(value - a) <= 0.1:  # same tolerance as the verifier (0.1 point)
+        if abs(value - a) <= 0.1 + 1e-6:  # same tolerance as the verifier (0.1 point)
             return True
         if float(value).is_integer() and round(a) == value:
             return True

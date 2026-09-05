@@ -354,7 +354,7 @@ def verify(script: str, source_pdf: str, prior_pdf: str | None = None, profiles_
     for slide, sent in sentences:
         for m in PCT_RE.finditer(sent):
             v = abs(float(m.group(1)))
-            match = next((lab for a, lab in allowed_pcts.items() if abs(a - v) <= 0.1 or (v.is_integer() and round(a) == v)), None)
+            match = next((lab for a, lab in allowed_pcts.items() if abs(a - v) <= 0.1 + 1e-6 or (v.is_integer() and round(a) == v)), None)
             if match:
                 items.append(Item("percent", m.group(0).strip(), "verified", slide, label=f"recomputed: {match}"))
             else:

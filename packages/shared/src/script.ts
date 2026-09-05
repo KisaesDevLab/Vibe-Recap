@@ -112,7 +112,7 @@ export function validateScript(script: string, ex: ExtractionDto): ScriptValidat
   }
   for (const m of body.matchAll(PCT_RE)) {
     const v = Math.abs(parseFloat(m[1]!));
-    const ok = pcts.some((a) => Math.abs(v - a) <= 0.1 || (Number.isInteger(v) && Math.round(a) === v));
+    const ok = pcts.some((a) => Math.abs(v - a) <= 0.1 + 1e-6 || (Number.isInteger(v) && Math.round(a) === v));
     if (!ok) errors.push(`percentage ${m[0].trim()} is not one of the computed figures`);
   }
   for (const m of body.matchAll(BARE_NUM_RE)) {

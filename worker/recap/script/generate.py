@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import hashlib
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
@@ -28,7 +28,7 @@ OBS_TEXT = {
     "yoy_agi": "Adjusted gross income changed by {delta} ({pct}) compared with last year",
     "yoy_total_tax": "Total tax changed by {delta} ({pct}) compared with last year",
     "yoy_result": "The bottom-line result moved by {delta} compared with last year",
-    "withholding_ratio": "Withholding covered {pct} of the total tax (difference {delta})",
+    "withholding_ratio": "Withholding covered {pct} of the total tax",
     "std_itemized_proximity": "Itemized deductions came within {delta} of the standard deduction",
     "underpayment_penalty": "The return includes an estimated tax underpayment penalty of {delta}",
 }
@@ -152,8 +152,23 @@ def render_prompt(section: str, ex: dict[str, Any], settings: dict[str, Any], no
     ).strip()
 
 
-def generate(ex: dict[str, Any], settings: dict[str, Any], note: str | None, client: Ollama, log: Any = None) -> tuple[str, list[dict[str, Any]]]:
-    """Returns (script, attempts). Raises OllamaError or ValueError after MAX_ATTEMPTS failures."""
+Verifier = Callable[[str], list[str]]
+
+
+def generate(
+    ex: dict[str, Any],
+    settings: dict[str, Any],
+    note: str | None,
+    client: Ollama,
+    log: Any = None,
+    verifier: Verifier | None = None,
+) -> tuple[str, list[dict[str, Any]]]:
+    """Returns (script, attempts). Raises OllamaError or ValueError after MAX_ATTEMPTS failures.
+
+    `verifier` (the independent script-to-return check) runs after the validator passes; its
+    flagged items are fed back exactly like validator errors, so a number used in the wrong role
+    (an allowed figure called "total tax") is corrected on the next attempt.
+    """
     messages = [
         {"role": "system", "content": render_prompt("system", ex, settings, note)},
         {"role": "user", "content": render_prompt("user", ex, settings, note)},
@@ -164,12 +179,17 @@ def generate(ex: dict[str, Any], settings: dict[str, Any], note: str | None, cli
         result = client.chat(messages)
         script = result.content.strip()
         v = validate_script(script, ex)
-        attempts.append({"attempt": n, "ok": v.ok, "errors": v.errors[:10], "words": v.word_count, "ms": result.total_ms})
+        errors = list(v.errors)
+        if v.ok and verifier is not None:
+            errors = [f"verification: {e}" for e in verifier(script)]
+        ok = not errors
+        attempts.append({"attempt": n, "ok": ok, "errors": errors[:10], "words": v.word_count, "ms": result.total_ms})
         if log:
-            log.info("script attempt", extra={"attempt": n, "ok": v.ok, "words": v.word_count, "error_count": len(v.errors)})
-        if v.ok:
+            log.info("script attempt", extra={"attempt": n, "ok": ok, "words": v.word_count, "error_count": len(errors)})
+        if ok:
             return script, attempts
-        last_errors = v.errors
+        last_errors = errors
+        v.errors = errors
         messages.append({"role": "assistant", "content": script})
         messages.append({"role": "user", "content": format_errors_for_model(v)})
     err = ValueError("validator rejected the script after 3 attempts: " + "; ".join(last_errors[:5]))
@@ -198,8 +218,18 @@ def generate_script(ctx: Any) -> None:
     if ctx.extraction is None:
         raise StepFailed("script", "extraction missing")
     client = _client_for(ctx)
+
+    def verifier(candidate: str) -> list[str]:
+        # Same independent check the verify step runs later; here it only shapes the retry.
+        from ..verify.verify import verify
+
+        if ctx.source_pdf is None:
+            return []
+        v = verify(candidate, str(ctx.source_pdf), str(ctx.prior_pdf) if ctx.prior_pdf else None, ctx.cfg.profiles_dir)
+        return [f"{i.kind} {i.text}: {i.reason}" for i in v.items if i.status == "flagged"]
+
     try:
-        script, attempts = generate(ctx.extraction, ctx.settings, ctx.job.get("note"), client, ctx.log)
+        script, attempts = generate(ctx.extraction, ctx.settings, ctx.job.get("note"), client, ctx.log, verifier=verifier)
     except OllamaError as exc:
         raise StepFailed("script", str(exc)) from exc
     except ValueError as exc:
