@@ -167,6 +167,8 @@ Keep a separate offline copy of `data/keys/master.key`. Without it the blobs can
 | Browser shows a certificate error in `lan` mode | Expected once. Import the root certificate (section 4) or click through. |
 | `readyz` says `degraded` | Ollama is still downloading the model, or `OLLAMA_URL` points somewhere unreachable. `docker compose logs ollama-init`. |
 | Job fails at `script` with "model ... is not available" | The model is not pulled yet, or the model name in Settings > General does not match. Use *Test Ollama*. |
+| Sign-in with the seeded admin says "Invalid email or password" (appliance) | The seed never ran. Run `sudo docker exec vibe-recap-api seed-admin` (older images: `sudo docker exec vibe-recap-api docker-entrypoint.sh seed-admin`); it is a no-op once any user exists. |
+| Sign-in succeeds and the next page bounces back to the login form | The session cookie is marked Secure but the page is plain HTTP (LAN mode, emergency port). Set `COOKIE_SECURE=false` in the api env and restart it; on the appliance the template renders this per mode. |
 | Job fails at `extract` with "required lines missing" | The package is not a 1040, or the software layout needs a profile tweak. Copy `data/form-profiles/1040-2025-<software>.yaml`, adjust, re-extract. |
 | Job fails at `recon` | The extracted lines do not foot. Open the job, read the check that failed. A preparer can downgrade one check with a reason; the job then proceeds and the exception stays visible. |
 | Job fails at `verify` | The script states something the return does not support. Edit the script or regenerate. |

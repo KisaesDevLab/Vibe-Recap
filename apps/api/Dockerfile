@@ -25,7 +25,13 @@ COPY --from=build /src/apps/api/dist ./apps/api/dist
 COPY --from=build /src/apps/api/drizzle ./apps/api/drizzle
 COPY --from=build /src/apps/api/data ./apps/api/data
 COPY apps/api/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh && mkdir -p /data && chown node:node /data
+# The CLI subcommands are handled by the entrypoint, but orchestrators run them with
+# `docker exec <container> seed-admin`, which bypasses the entrypoint and needs a real
+# executable on PATH (the Vibe Appliance seeds the first admin this way; Q47).
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh && mkdir -p /data && chown node:node /data \
+ && for cmd in seed-admin migrate rotate-master-key; do \
+      printf '#!/bin/sh\nexec /usr/local/bin/docker-entrypoint.sh %s "$@"\n' "$cmd" > /usr/local/bin/$cmd && chmod +x /usr/local/bin/$cmd; \
+    done
 # Starts as root only to fix /data ownership on a fresh bind mount, then drops to uid 1000 (node).
 # The worker container runs as the same uid so both can read the master key and blobs.
 EXPOSE 3000

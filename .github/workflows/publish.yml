@@ -82,3 +82,13 @@ jobs:
           provenance: mode=max
           cache-from: type=gha
           cache-to: type=gha,mode=max
+      # The appliance seeds the first admin with `docker exec <container> seed-admin`, which
+      # bypasses the entrypoint: the subcommands must exist on PATH (Q47). Usage exit is 2.
+      - if: matrix.image == 'api'
+        run: |
+          tag="$(echo "${{ steps.meta.outputs.tags }}" | head -n1)"
+          for cmd in seed-admin migrate; do
+            docker run --rm --entrypoint "$cmd" "$tag" >/dev/null 2>&1; rc=$?
+            echo "$cmd exit=$rc"
+            test "$rc" -ne 127 && test "$rc" -ne 126 || { echo "$cmd is not on PATH in the api image"; exit 1; }
+          done
