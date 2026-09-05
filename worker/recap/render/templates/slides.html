@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+  :root { --primary: {{ primary }}; --secondary: {{ secondary }}; --ink: #1b1f27; --muted: #6b7280; --paper: #f8f7f4; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: var(--paper); color: var(--ink);
+    font-family: "Liberation Sans", "DejaVu Sans", Arial, Helvetica, sans-serif; }
+  .slide { position: relative; width: 1920px; height: 1080px; padding: 96px 120px 120px; }
+  .band { position: absolute; left: 0; top: 0; width: 100%; height: 18px; background: var(--primary); }
+  .band::after { content: ""; position: absolute; left: 0; top: 18px; width: 280px; height: 8px; background: var(--secondary); }
+  header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 40px; }
+  header .firm { display: flex; align-items: center; gap: 24px; font-size: 30px; color: var(--muted); letter-spacing: 0.02em; }
+  header img { max-height: 72px; max-width: 320px; }
+  header .year { font-size: 30px; color: var(--muted); }
+  h1 { font-size: 72px; font-weight: 700; margin: 0 0 16px; color: var(--primary); letter-spacing: -0.01em; }
+  h2 { font-size: 40px; font-weight: 400; margin: 0 0 48px; color: var(--muted); }
+  .big { font-size: 120px; font-weight: 700; color: var(--primary); line-height: 1; margin: 24px 0; font-variant-numeric: tabular-nums; }
+  .big.owed { color: #9a3412; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; }
+  table.figures { width: 100%; border-collapse: collapse; font-size: 38px; }
+  table.figures td { padding: 14px 0; border-bottom: 2px solid #e5e2da; }
+  table.figures td.v { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+  table.figures tr.total td { border-top: 4px solid var(--primary); border-bottom: none; font-weight: 700; color: var(--primary); }
+  .bars { display: flex; flex-direction: column; gap: 22px; font-size: 32px; }
+  .bar { display: grid; grid-template-columns: 300px 1fr 240px; align-items: center; gap: 20px; }
+  .bar .track { height: 44px; background: #e9e6df; border-radius: 8px; overflow: hidden; }
+  .bar .fill { height: 100%; background: var(--primary); border-radius: 8px; }
+  .bar .fill.neg { background: #b45309; }
+  .bar .v { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+  .callout { background: white; border-left: 12px solid var(--secondary); padding: 32px 40px; font-size: 40px; border-radius: 8px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
+  .obs { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
+  .obs .card { background: white; border-radius: 12px; padding: 32px 36px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
+  .obs .label { font-size: 30px; color: var(--muted); margin-bottom: 8px; }
+  .obs .value { font-size: 56px; font-weight: 700; color: var(--primary); font-variant-numeric: tabular-nums; }
+  .obs .value.down { color: #9a3412; }
+  footer { position: absolute; left: 120px; right: 120px; bottom: 56px; display: flex; justify-content: space-between; font-size: 26px; color: var(--muted); }
+  .states { margin-top: 40px; font-size: 34px; color: var(--muted); }
+  .compare { display: flex; gap: 48px; align-items: flex-end; height: 420px; margin-top: 40px; }
+  .compare .col { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 16px; font-size: 34px; }
+  .compare .stack { width: 100%; background: #e9e6df; border-radius: 10px 10px 0 0; position: relative; height: 320px; }
+  .compare .stack div { position: absolute; bottom: 0; left: 0; right: 0; background: var(--primary); border-radius: 10px 10px 0 0; }
+  .compare .stack.pay div { background: var(--secondary); }
+  .compare .amt { font-weight: 700; font-size: 44px; font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+<div class="slide">
+  <div class="band"></div>
+  <header>
+    <div class="firm">{% if firm_logo %}<img src="{{ firm_logo }}" alt="">{% endif %}<span>{{ firm_name }}</span></div>
+    <div class="year">Tax year {{ tax_year }}</div>
+  </header>
+
+  {% if slide == "greeting" %}
+    <h1>{% if names %}Hello, {{ names }}.{% else %}Hello.{% endif %}</h1>
+    <h2>Your {{ tax_year }} tax return, explained in plain English.</h2>
+    <div class="callout">Filing status: <strong>{{ filing_status }}</strong>{% if states %} &nbsp;·&nbsp; Federal{% for s in states %}, {{ s }}{% endfor %}{% endif %}</div>
+
+  {% elif slide == "income" %}
+    <h1>What you earned</h1>
+    <h2>Total income <strong>{{ ex.income.total_income | money }}</strong></h2>
+    <div class="bars">
+      {% for b in income_bars %}
+      <div class="bar"><span>{{ b.label }}</span><div class="track"><div class="fill{% if b.negative %} neg{% endif %}" style="width: {{ b.width }}%"></div></div><span class="v">{{ b.text }}</span></div>
+      {% endfor %}
+    </div>
+
+  {% elif slide == "deductions" %}
+    <h1>From income to taxable income</h1>
+    <h2>{{ deduction_type }} deduction</h2>
+    <table class="figures">
+      <tr><td>Total income</td><td class="v">{{ ex.income.total_income | money }}</td></tr>
+      {% if ex.adjustments.schedule_1_adjustments %}<tr><td>Adjustments to income</td><td class="v">&minus; {{ ex.adjustments.schedule_1_adjustments | money }}</td></tr>{% endif %}
+      <tr><td>Adjusted gross income</td><td class="v">{{ ex.adjustments.agi | money }}</td></tr>
+      <tr><td>{{ deduction_type }} deduction</td><td class="v">&minus; {{ ex.deductions.amount | money }}</td></tr>
+      {% if ex.deductions.qbi %}<tr><td>Qualified business income deduction</td><td class="v">&minus; {{ ex.deductions.qbi | money }}</td></tr>{% endif %}
+      <tr class="total"><td>Taxable income</td><td class="v">{{ ex.deductions.taxable_income | money }}</td></tr>
+    </table>
+
+  {% elif slide == "tax" %}
+    <h1>Your tax</h1>
+    <h2>Effective rate <strong>{{ effective_rate | pct }}</strong> of taxable income</h2>
+    <table class="figures">
+      <tr><td>Income tax</td><td class="v">{{ ex.tax.tax | money }}</td></tr>
+      {% if ex.tax.schedule_2_total %}<tr><td>Additional tax (Schedule 2)</td><td class="v">+ {{ ex.tax.schedule_2_total | money }}</td></tr>{% endif %}
+      {% if ex.tax.nonrefundable_credits %}<tr><td>Credits</td><td class="v">&minus; {{ ex.tax.nonrefundable_credits | money }}</td></tr>{% endif %}
+      {% if ex.tax.other_taxes %}<tr><td>Other taxes</td><td class="v">+ {{ ex.tax.other_taxes | money }}</td></tr>{% endif %}
+      <tr class="total"><td>Total tax</td><td class="v">{{ ex.tax.total_tax | money }}</td></tr>
+    </table>
+
+  {% elif slide == "result" %}
+    <div class="grid">
+      <div>
+        <h1>{% if result_kind == "refund" %}Your refund{% elif result_kind == "owed" %}Balance due{% else %}All settled{% endif %}</h1>
+        <div class="big{% if result_kind == 'owed' %} owed{% endif %}">{{ result_amount | money }}</div>
+        <table class="figures">
+          <tr><td>Total payments</td><td class="v">{{ ex.payments.total_payments | money }}</td></tr>
+          <tr><td>Total tax</td><td class="v">&minus; {{ ex.tax.total_tax | money }}</td></tr>
+          {% if ex.result.applied_to_next_year %}<tr><td>Applied to next year</td><td class="v">&minus; {{ ex.result.applied_to_next_year | money }}</td></tr>{% endif %}
+        </table>
+        {% if state_rows %}
+        <div class="states">{% for s in state_rows %}{{ s.code }}: {% if s.refund %}refund {{ s.refund | money }}{% elif s.amount_owed %}balance due {{ s.amount_owed | money }}{% else %}settled{% endif %}{% if not loop.last %} &nbsp;·&nbsp; {% endif %}{% endfor %}</div>
+        {% endif %}
+      </div>
+      <div class="compare">
+        <div class="col"><span class="amt">{{ ex.payments.total_payments | money }}</span><div class="stack pay"><div style="height: {{ pay_bar }}%"></div></div><span>Paid in</span></div>
+        <div class="col"><span class="amt">{{ ex.tax.total_tax | money }}</span><div class="stack"><div style="height: {{ tax_bar }}%"></div></div><span>Total tax</span></div>
+      </div>
+    </div>
+
+  {% elif slide == "observations" %}
+    <h1>Worth noticing</h1>
+    <h2>{% if observations %}Computed from your return{% if ex.prior_year.present %} and last year's{% endif %}.{% else %}Nothing unusual stood out this year.{% endif %}</h2>
+    <div class="obs">
+      {% for o in observations %}
+      <div class="card">
+        <div class="label">{{ o.label }}</div>
+        <div class="value{% if o.delta < 0 and o.id != 'withholding_ratio' %} down{% endif %}">
+          {% if o.id == 'withholding_ratio' %}{{ o.pct | pct }}{% elif o.id == 'underpayment_penalty' %}{{ o.delta | money }}{% else %}{% if o.delta > 0 %}+{% endif %}{{ o.delta | money }}{% if o.pct %} <span style="font-size:36px">({{ o.pct | pct }})</span>{% endif %}{% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+  {% elif slide == "next" %}
+    <h1>Next steps</h1>
+    <h2>Questions for your review meeting</h2>
+    <div class="callout">{{ signoff }}</div>
+    {% if firm_name %}<div class="states">{{ firm_name }}</div>{% endif %}
+  {% endif %}
+
+  <footer><span>{{ firm_name }}</span><span>{{ slide_index }} / {{ slide_count }}</span></footer>
+</div>
+</body>
+</html>

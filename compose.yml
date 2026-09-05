@@ -92,7 +92,6 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-info}
     volumes:
       - ${RECAP_DATA:-./data}:/data
-      - worker_models:/models
     networks: [backend]
     depends_on:
       postgres: { condition: service_healthy }
@@ -168,4 +167,3 @@ volumes:
   pg_data: {}
   redis_data: {}
   ollama_models: {}
-  worker_models: {}

@@ -1,0 +1,148 @@
+"""Render tests. Narration uses a fake synthesizer; Kokoro, Chromium, and ffmpeg run when present."""
+
+from __future__ import annotations
+
+import json
+import os
+import shutil
+import wave
+from pathlib import Path
+from types import SimpleNamespace
+
+import numpy as np
+import pytest
+
+from recap.render import mux, slides, tts
+
+ROOT = Path(__file__).resolve().parents[2]
+FIXTURES = ROOT / "tests" / "fixtures"
+GOLDEN = FIXTURES / "scripts"
+MODELS = Path(os.environ.get("MODELS_DIR", ROOT / "worker" / "models"))
+
+
+def extraction(case: str, software: str = "ultratax") -> dict:
+    return json.loads((FIXTURES / f"{software}-1040-2025-{case}.expected.json").read_text())
+
+
+def fake_synth(text: str):
+    """0.02 s of tone per word so durations are proportional to length."""
+    words = max(1, len(text.split()))
+    sr = 24000
+    t = np.linspace(0, 0.02 * words, int(0.02 * words * sr), endpoint=False)
+    return (0.1 * np.sin(2 * np.pi * 440 * t)).astype(np.float32), sr
+
+
+def test_split_and_narrate_with_fake_synth():
+    script = (GOLDEN / "mfj-refund-mo.md").read_text(encoding="utf-8")
+    pieces = tts.split_script(script)
+    assert pieces[0][0] == "greeting" and pieces[-1][0] == "next"
+    n = tts.narrate(script, fake_synth)
+    assert len(n.sentences) == len(pieces)
+    assert set(n.slide_wavs) == {"greeting", "income", "deductions", "tax", "result", "observations", "next"}
+    assert abs(sum(n.slide_durations.values()) - n.total) < 0.01
+    # sentence starts are cumulative
+    for a, b in zip(n.sentences, n.sentences[1:]):
+        assert abs(a.start + a.duration - b.start) < 1e-6
+    with wave.open(__import__("io").BytesIO(n.slide_wavs["income"]), "rb") as w:
+        assert w.getframerate() == 24000 and w.getnchannels() == 1
+    vtt = tts.to_vtt(n.sentences)
+    assert vtt.startswith("WEBVTT") and vtt.count("-->") == len(pieces)
+    assert "[[slide" not in tts.to_txt(script)
+
+
+@pytest.mark.skipif(not (MODELS / "kokoro-v1.0.onnx").exists(), reason="Kokoro model files not present")
+def test_kokoro_synthesizes_a_sentence():
+    synth = tts.kokoro_synth(str(MODELS), "af_heart")
+    samples, sr = synth("Your total income for the year was one hundred fifty thousand dollars.")
+    assert sr == 24000 and len(samples) / sr > 2.0
+
+
+def test_slide_html_uses_extraction_numbers_only():
+    ex = extraction("single-owed-itemized")
+    settings = {"firm_name": "Test CPA", "color_primary": "#123456", "signoff_sentence": "See you soon."}
+    html = slides.render_html("result", ex, settings)
+    assert "Balance due" in html and "$1,640" in html and "#123456" in html
+    html = slides.render_html("income", ex, settings)
+    assert "$107,310" in html and "-$3,000" in html  # capital loss rendered as negative
+    html = slides.render_html("greeting", extraction("mfj-refund-mo"), settings)
+    assert "Alex &amp; Jordan" in html and "Married filing jointly" in html
+    html = slides.render_html("greeting", extraction("mfj-refund-mo"), {**settings, "greeting_use_first_names": False})
+    assert "Alex" not in html
+    html = slides.render_html("next", ex, settings)
+    assert "See you soon." in html
+    for s in slides.SLIDES:
+        assert "{{" not in slides.render_html(s, ex, settings)
+
+
+def _chromium_available() -> bool:
+    try:
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as p:
+            b = p.chromium.launch(args=["--no-sandbox"])
+            b.close()
+        return True
+    except Exception:  # noqa: BLE001
+        return False
+
+
+@pytest.mark.skipif(not _chromium_available(), reason="Playwright Chromium not installed")
+def test_slides_render_to_1920x1080_png(tmp_path):
+    ex = extraction("hoh-refund-two-states", "drake")
+    htmls = [slides.render_html(s, ex, {"firm_name": "Test CPA"}) for s in slides.SLIDES]
+    paths = slides.render_pngs(htmls, tmp_path / "slides")
+    assert len(paths) == 7
+    from PIL import Image
+
+    for p in paths:
+        with Image.open(p) as im:
+            assert im.size == (1920, 1080)
+    # the result slide is not blank
+    with Image.open(paths[4]) as im:
+        assert len(set(im.convert("L").getdata())) > 10
+
+
+@pytest.mark.skipif(not mux.ffmpeg_available() or not _chromium_available(), reason="ffmpeg or Chromium missing")
+def test_end_to_end_mp4_duration_and_vtt_cues(tmp_path):
+    script = (GOLDEN / "single-owed-itemized.md").read_text(encoding="utf-8")
+    ex = extraction("single-owed-itemized", "lacerte")
+    narration = tts.narrate(script, fake_synth)
+    htmls = [slides.render_html(s, ex, {"firm_name": "Test CPA"}) for s in slides.SLIDES]
+    pngs = slides.render_pngs(htmls, tmp_path / "slides")
+    wavs = []
+    durations = []
+    for s in slides.SLIDES:
+        p = tmp_path / f"{s}.wav"
+        p.write_bytes(narration.slide_wavs[s])
+        wavs.append(p)
+        durations.append(narration.slide_durations[s])
+    audio = tmp_path / "narration.wav"
+    mux.concat_audio(wavs, audio)
+    out = tmp_path / "recap.mp4"
+    mux.build_video(pngs, durations, audio, out)
+    assert out.exists() and out.stat().st_size > 10_000
+    total = mux.probe_duration(out) if shutil.which("ffprobe") else sum(durations)
+    expected = sum(durations)
+    assert abs(total - expected) / expected < 0.10
+    vtt = tts.to_vtt(narration.sentences)
+    assert vtt.count("-->") == len(narration.sentences)
+
+
+def test_mux_step_refuses_without_audio():
+    from recap.pipeline import StepFailed
+
+    ctx = SimpleNamespace(audio=[], slides=[], workdir=Path("."), script="", db=None)
+    if mux.ffmpeg_available():
+        with pytest.raises(StepFailed, match="audio or slides missing"):
+            mux.mux(ctx)
+    else:
+        with pytest.raises(StepFailed, match="ffmpeg"):
+            mux.mux(ctx)
+
+
+def test_tts_step_refuses_until_verification_passed():
+    from recap.pipeline import StepFailed
+
+    ctx = SimpleNamespace(script="[[slide:greeting]] Hi.", verification={"passed": False}, settings={}, cfg=SimpleNamespace(models_dir=str(MODELS)))
+    with pytest.raises(StepFailed, match="verification has not passed"):
+        tts.synthesize(ctx, synth=fake_synth)

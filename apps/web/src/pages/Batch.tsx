@@ -3,12 +3,14 @@ import { useParams } from "react-router";
 import type { BatchDto } from "@vibe-recap/shared";
 import { useApi } from "../lib/useApi";
 import { ApiError, post } from "../lib/api";
+import { useAuth } from "../lib/auth";
 import { fmtDate } from "../lib/format";
 import { JobTable } from "../components/JobTable";
 import { Alert, Button, Card, PageTitle, Spinner } from "../ui";
 
 export function BatchPage() {
   const { id } = useParams();
+  const { can } = useAuth();
   const { data, error, loading, reload } = useApi<BatchDto>(id ? `/api/batches/${id}` : null, 4000);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -20,7 +22,22 @@ export function BatchPage() {
   const total = jobs.length || data.fileCount;
   const done = jobs.filter((j) => ["needs_review", "approved", "released", "purged", "failed", "rejected"].includes(j.status)).length;
   const failed = jobs.filter((j) => j.status === "failed");
+  const reviewable = jobs.filter((j) => j.status === "needs_review");
   const pct = total ? Math.round((done / total) * 100) : 0;
+
+  async function approveVerified() {
+    setBusy(true);
+    setMsg(null);
+    try {
+      const r = await post<{ approved: string[]; skipped: Array<{ id: string; reason: string }> }>(`/api/batches/${data!.id}/approve-verified`);
+      setMsg(`Approved ${r.approved.length} job(s).${r.skipped.length ? ` Skipped ${r.skipped.length}: ` + r.skipped.map((s) => `${s.id.slice(0, 8)} (${s.reason})`).join("; ") : ""}`);
+      await reload();
+    } catch (err) {
+      setMsg(err instanceof ApiError ? err.message : "Bulk approve failed");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function retryAll() {
     setBusy(true);
@@ -40,11 +57,18 @@ export function BatchPage() {
     <>
       <PageTitle
         actions={
-          failed.length > 0 ? (
-            <Button variant="secondary" size="sm" onClick={retryAll} disabled={busy}>
-              Retry {failed.length} failed
-            </Button>
-          ) : undefined
+          <>
+            {failed.length > 0 && (
+              <Button variant="secondary" size="sm" onClick={retryAll} disabled={busy}>
+                Retry {failed.length} failed
+              </Button>
+            )}
+            {reviewable.length > 0 && can("preparer") && (
+              <Button size="sm" onClick={approveVerified} disabled={busy} title="Approves every job in review with zero verification flags and no recon exceptions; each approval is audited">
+                Approve all verified ({reviewable.length})
+              </Button>
+            )}
+          </>
         }
       >
         Batch {data.id.slice(0, 8)}

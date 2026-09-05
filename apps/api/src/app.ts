@@ -19,6 +19,7 @@ import { jobRoutes } from "./routes/jobs.js";
 import { uploadRoutes } from "./routes/uploads.js";
 import { extractionRoutes } from "./routes/extraction.js";
 import { scriptRoutes } from "./routes/script.js";
+import { reviewRoutes } from "./routes/review.js";
 import type { Storage } from "./services/storage.js";
 import { Queues, type Stager } from "./services/queue.js";
 import { StagingService } from "./services/staging.js";
@@ -110,6 +111,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   await app.register(uploadRoutes);
   await app.register(extractionRoutes);
   await app.register(scriptRoutes);
+  await app.register(reviewRoutes);
 
   const tasks = deps.cron ? startCron(app) : [];
   app.addHook("onClose", async () => {

@@ -11,7 +11,7 @@ Updated by Claude Code at the end of each phase. Read after CLAUDE.md, docs/PLAN
 | 3 Extraction, profiles, recon | done 2026-09-05 | 6/6 layouts match `.expected.json` exactly; recon gate, exceptions, re-extract, extraction panel; pipeline orchestrator with resume points |
 | 4 OCR fallback | done 2026-09-05 | rasterize + Ollama OCR + invisible text-layer overlay; 90 s per-page cap; tested with a stand-in OCR engine, not yet against real GLM-OCR |
 | 5 Script, validator, verifier | done 2026-09-05 | prompt + Ollama client + 3-attempt loop, Python validator with TS mirror, independent verifier (own PDF pass) with page/label evidence; golden scripts pass on all 6 layouts; script editor + verification panel |
-| 6 Render, review, approval | not started | |
+| 6 Render, review, approval | done 2026-09-05 | Kokoro per-sentence narration, Jinja/Playwright slides, ffmpeg xfade mux, VTT/TXT; approve with three-hash snapshot, reject, re-render, bulk approve; whole-pipeline test produces an MP4. Passkeys/TOTP deferred (Q25) |
 | 7 Release and download | not started | |
 | 8 Retention and purge | not started | |
 | 9 Users, audit UI, licensing, backup, docs | not started | |
@@ -34,6 +34,12 @@ Updated by Claude Code at the end of each phase. Read after CLAUDE.md, docs/PLAN
   double as the stub model's output in pipeline tests (`_client_for` is monkeypatched). The verifier
   reads only `recap.numbers`; `test_verify.py` greps its imports. Verification items carry
   `page` + `label`; the UI links to `/api/jobs/:id/source.pdf#page=N`.
+- Phase 6: render steps are `render/tts.py` (Kokoro, per-sentence WAVs grouped per slide),
+  `render/slides.py` (Jinja `templates/slides.html` -> Playwright PNG), `render/mux.py` (xfade +
+  concat audio). Tests inject `fake_synth` and monkeypatch `tts.kokoro_synth`. On Windows the
+  winget ffmpeg lives under `AppData/Local/Microsoft/WinGet/Packages/Gyan.FFmpeg_*` and must be on
+  PATH for the mux tests; they skip otherwise. `approvalCheck()` in `routes/review.ts` is the single
+  source of approval rules; bulk approve calls it per job.
 
 - Phase 1: `npm run test:services` starts a throwaway Postgres (55432) and Redis (56379) that the
   API integration tests use; they skip with a warning when those are unreachable. The worker venv
