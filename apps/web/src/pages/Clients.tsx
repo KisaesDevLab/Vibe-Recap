@@ -178,6 +178,31 @@ export function ClientDetailPage() {
               {c.legalHold && <Badge tone="red">legal hold active</Badge>}
             </form>
           </Card>
+          {can("admin") && (
+            <Card title="Purge this client now">
+              <p className="mb-2 text-xs text-slate-500">Shreds every file of every job for this client, immediately, and logs each one. Type the client name exactly to confirm. Refused while a legal hold is active.</p>
+              <form
+                className="flex gap-2"
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  const fd = new FormData(e.currentTarget);
+                  setMsg(null);
+                  try {
+                    const r = await post<{ purgedFiles: number; purgedJobs: number }>(`/api/clients/${id}/purge-now`, { confirmName: fd.get("confirmName") });
+                    setMsg(`Purged ${r.purgedFiles} file(s) across ${r.purgedJobs} job(s).`);
+                    await reload();
+                  } catch (err) {
+                    setMsg(err instanceof ApiError ? err.message : "Purge failed");
+                  }
+                }}
+              >
+                <Input name="confirmName" placeholder={c.name} required />
+                <Button type="submit" variant="danger">
+                  Purge
+                </Button>
+              </form>
+            </Card>
+          )}
         </div>
       </div>
     </>

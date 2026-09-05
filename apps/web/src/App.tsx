@@ -10,6 +10,8 @@ import { UploadPage } from "./pages/Upload";
 import { BatchPage } from "./pages/Batch";
 import { ClientDetailPage, ClientsPage } from "./pages/Clients";
 import { JobPage } from "./pages/Job";
+import { SettingsLayout } from "./pages/Settings";
+import { SettingsRetentionPage } from "./pages/SettingsRetention";
 import { Alert, Spinner } from "./ui";
 
 function RequireAuth({ children }: { children: ReactNode }) {
@@ -72,6 +74,17 @@ export function App() {
             </RequireRole>
           }
         />
+        <Route
+          path="/settings"
+          element={
+            <RequireRole min="admin">
+              <SettingsLayout />
+            </RequireRole>
+          }
+        >
+          <Route index element={<Navigate to="/settings/retention" replace />} />
+          <Route path="retention" element={<SettingsRetentionPage />} />
+        </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>
