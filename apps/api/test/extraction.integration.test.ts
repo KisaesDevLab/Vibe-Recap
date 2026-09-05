@@ -1,7 +1,7 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Client, createTestContext, servicesAvailable, type TestContext } from "./helpers.js";
 import { clients, files, jobs, users } from "../src/db/schema.js";
@@ -48,8 +48,8 @@ describe.skipIf(!available)("extraction, recon exceptions, re-extract", () => {
     expect(body.extraction.recon.passed).toBe(false);
     expect(body.sha256).toHaveLength(64);
     expect(body.reconExceptions).toEqual([]);
-    const reads = await ctx.db.execute(`select count(*)::int as n from audit_events where action = 'file.read' and target_id = '${jobId}'` as never);
-    expect(Number((reads as unknown as Array<{ n: number }>)[0]!.n)).toBe(1);
+    const reads = await ctx.db.execute<{ n: number }>(sql`select count(*)::int as n from audit_events where action = 'file.read' and target_id = ${jobId}`);
+    expect(Number(reads[0]!.n)).toBe(1);
   });
 
   it("refuses an exception without a 20-character reason and from a non-preparer", async () => {
@@ -73,8 +73,8 @@ describe.skipIf(!available)("extraction, recon exceptions, re-extract", () => {
     expect(job!.resumeFrom).toBe("recon");
     expect(job!.reconExceptions[0]!.check).toBe("total_income_foots");
     expect(job!.reconExceptions[0]!.by).toBe("admin@example.com");
-    const audits = await ctx.db.execute(`select action from audit_events where target_id = '${jobId}' order by id` as never);
-    const actions = (audits as unknown as Array<{ action: string }>).map((a) => a.action);
+    const audits = await ctx.db.execute<{ action: string }>(sql`select action from audit_events where target_id = ${jobId} order by id`);
+    const actions = audits.map((a) => a.action);
     expect(actions).toContain("job.recon_exception");
     expect(actions).toContain("job.retry");
     const again = await admin.post(`/api/jobs/${jobId}/recon-exceptions`, { check: "total_income_foots", reason: "this reason is definitely long enough" });
