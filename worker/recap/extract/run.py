@@ -58,5 +58,7 @@ def extract_return(
     doc["prior_year"] = prior
     doc["observations"] = compute_observations(doc)
     doc["recon"] = reconcile(doc, recon_exceptions)
-    doc.pop("_extras", None)
+    # Kept in the extraction so a later recon pass (the pipeline's recon step, a per-job exception)
+    # still knows about the penalty that line 37 folds into the amount owed.
+    doc["extras"] = doc.pop("_extras", {})
     return doc

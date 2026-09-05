@@ -295,7 +295,11 @@ def read_return(pages: list[VPage], prior_pages: list[VPage] | None, profiles_di
                 if not any(c.isdigit() for c in w.text):
                     continue
                 v = parse_amount(w.text)
-                if v is None or v == 0:
+                if v is None:
+                    continue
+                # A printed zero counts only in the amount column ("24 ... total tax 24  0"), so a
+                # script's "$0" traces to a line that really shows zero, not to a stray digit.
+                if v == 0 and not (w.text.strip("$") in ("0", "-0-", "0.00") and w.x0 >= 380):
                     continue
                 label = " ".join(x.text for x in ln.words if x is not w)[:80]
                 f.amount_index.setdefault(abs(v), []).append((p.number, label))
@@ -442,6 +446,10 @@ def verify(script: str, source_pdf: str, prior_pdf: str | None = None, profiles_
         deltas = {abs(L[k] - facts.prior[k]) for k in ("agi", "total_tax", "refund", "amount_owed") if k in L and k in facts.prior}
         deltas |= {abs(v) for v in facts.prior.values() if isinstance(v, int)}
         deltas |= {abs(L.get("refund", 0) - L.get("amount_owed", 0) - (facts.prior.get("refund", 0) - facts.prior.get("amount_owed", 0)))}
+        # "unchanged": a figure that is the same both years, including one that is zero now and
+        # blank (unprinted) in the prior-year column of the comparison
+        if any(L.get(k, 0) == facts.prior.get(k, 0) for k in ("agi", "total_tax", "refund", "amount_owed") if k in L or k in facts.prior):
+            deltas.add(0)
         for v in amounts:
             if any(abs(abs(v) - d) <= 1 for d in deltas) or abs(v) in facts.amount_index:
                 items.append(Item("yoy", f"{v:,}", "verified", slide, label="recomputed from prior-year figures"))
@@ -483,10 +491,10 @@ def verify(script: str, source_pdf: str, prior_pdf: str | None = None, profiles_
     cap_words = re.findall(r"\b[A-Z][a-z]+\b", greeting)
     stop = {"Hi", "Hello", "Welcome", "Thanks", "Thank", "Here", "This", "Your", "The", "Let", "We", "It", "Good", "Dear", "For", "In", "On"}
     names_said = [w for w in cap_words if w not in stop and w != str(facts.tax_year)]
-    allowed_names = {n for n in (facts.first_name, facts.spouse_first_name) if n}
+    allowed_names = {n.casefold() for n in (facts.first_name, facts.spouse_first_name) if n}
     if facts.filing_status not in ("MFJ", "MFS"):
-        allowed_names.discard(facts.spouse_first_name or "")
-    bad = [n for n in names_said if n not in allowed_names]
+        allowed_names.discard((facts.spouse_first_name or "").casefold())
+    bad = [n for n in names_said if n.casefold() not in allowed_names]  # returns often print names in capitals
     if not names_said:
         items.append(Item("names", "-", "verified", "greeting", label="no name used"))
     elif not bad:
@@ -536,7 +544,8 @@ def verify(script: str, source_pdf: str, prior_pdf: str | None = None, profiles_
         return None
 
     refund_sentence = _asserts(r"\brefund")
-    owe_sentence = _asserts(r"\b(owe|owes|owed|balance due|amount due)\b")
+    # "you are owed a refund" / "owed money back" is the refund direction, not a balance due
+    owe_sentence = _asserts(r"\b(owe|owes|owed|balance due|amount due)\b(?!\s+(?:a\s+|your\s+)?(?:refund|money back))")
     says_refund = refund_sentence is not None
     says_owe = owe_sentence is not None
     if says_refund and not refund_amt:

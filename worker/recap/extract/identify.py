@@ -99,7 +99,7 @@ def find_names(words: list[Word]) -> tuple[str | None, str | None, str | None]:
     first_x0 = first_lbl[0].x0 - 4
     last_x0 = last_lbl[0].x0 - 4 if last_lbl else 10_000
     ssn_x0 = ssn_lbl[0].x0 - 4 if ssn_lbl else 10_000
-    band = [w for w in words if top - 1 <= w.top <= top + 20]
+    band = _first_row_below(words, top, first_x0, ssn_x0 if ssn_lbl else 10_000)
     first = " ".join(w.text for w in band if first_x0 <= w.x0 < last_x0)
     last = " ".join(w.text for w in band if last_x0 <= w.x0 < ssn_x0)
     first = _clean_name(first)
@@ -109,9 +109,22 @@ def find_names(words: list[Word]) -> tuple[str | None, str | None, str | None]:
     sp_lbl = _label_words(words, "If joint return, spouse's first name and middle initial") or _label_words(words, "Spouse's first name and middle initial")
     if sp_lbl:
         sp_top = max(w.bottom for w in sp_lbl)
-        sp_band = [w for w in words if sp_top - 1 <= w.top <= sp_top + 20 and first_x0 <= w.x0 < last_x0]
+        sp_band = [w for w in _first_row_below(words, sp_top, first_x0, last_x0) if first_x0 <= w.x0 < last_x0]
         spouse = _clean_name(" ".join(w.text for w in sp_band)) or None
     return first or None, last or None, spouse
+
+
+def _first_row_below(words: list[Word], top: float, x0: float, x1: float) -> list[Word]:
+    """Words of the first text row under `top` within [x0, x1): the value printed beneath a label.
+
+    Only one row is taken: on a compact form the next label ("If joint return, spouse's first
+    name...") sits a few points further down and must not be read as part of the name.
+    """
+    below = [w for w in words if top - 1 <= w.top <= top + 20 and x0 <= w.x0 < x1]
+    if not below:
+        return []
+    row_top = min(w.top for w in below)
+    return [w for w in below if abs(w.top - row_top) <= 3]
 
 
 def _clean_name(s: str) -> str:
@@ -121,7 +134,11 @@ def _clean_name(s: str) -> str:
     parts = s.split(" ")
     if len(parts) > 1 and len(parts[-1].rstrip(".")) == 1:
         parts = parts[:-1]
-    return " ".join(parts)
+    s = " ".join(parts)
+    # Returns are often printed in capitals ("FORREST K"); a mixed-case name is left as printed.
+    if s.isupper():
+        s = s.title()
+    return s
 
 
 def identify(pdf_path: str, profiles_dir: str | None = None, max_pages: int = 3) -> Identification:

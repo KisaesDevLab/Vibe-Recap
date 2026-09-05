@@ -32,3 +32,12 @@ def test_identify_single_and_prior_year():
 def test_detect_tax_year_prefers_header():
     assert detect_tax_year("Form 1040 (2025) ... 2026 estimated tax ... 2024 return") == 2025
     assert detect_tax_year("no years here") is None
+
+
+def test_names_printed_in_capitals_are_title_cased():
+    from recap.extract.identify import _clean_name
+
+    assert _clean_name("FORREST K") == "Forrest"
+    assert _clean_name("SARAH N") == "Sarah"
+    assert _clean_name("McDonald") == "McDonald"  # mixed case is left as printed
+    assert _clean_name("O'BRIEN") == "O'Brien"

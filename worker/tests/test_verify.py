@@ -162,3 +162,17 @@ def test_negated_direction_phrases_are_not_direction_claims():
     v = verify(bad, str(FIXTURES / f"ultratax-1040-2025-{case}.pdf"), None, str(PROFILES))
     reasons = [r for k, _, r in flagged(v) if k == "direction"]
     assert reasons and "That leaves a balance due" in reasons[0], flagged(v)
+
+
+def test_zero_amount_and_owed_a_refund_phrasing_and_capitalised_names():
+    """A return with a zero total tax prints "0" in the amount column; "you're owed a refund" is the
+    refund direction; names printed in capitals on the return match Title-case names in the script."""
+    case = "mfj-refund-mo"
+    script = golden(case).replace("[[slide:next]]", "This means you're owed a refund, not a balance due. [[slide:next]]")
+    v = verify(script, str(FIXTURES / f"ultratax-1040-2025-{case}.pdf"), None, str(PROFILES))
+    assert not any(k == "direction" for k, _, _ in flagged(v)), flagged(v)
+    # "$0" must trace to a printed zero: the fixture prints 0 on line 10 (adjustments) via Schedule 1? No:
+    # every fixture prints "0" for blank IRA/pension lines, so a script saying $0 is supported.
+    script0 = golden(case).replace("[[slide:next]]", "You had $0 of pension income this year. [[slide:next]]")
+    v = verify(script0, str(FIXTURES / f"ultratax-1040-2025-{case}.pdf"), None, str(PROFILES))
+    assert not any(k == "amount" and t == "$0" for k, t, _ in flagged(v)), flagged(v)

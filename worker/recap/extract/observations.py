@@ -21,7 +21,8 @@ def compute_observations(doc: dict[str, Any]) -> list[dict[str, Any]]:
         d = int(adj.get("agi", 0)) - int(py.get("agi", 0))
         obs.append({"id": "yoy_agi", "delta": d, "pct": _pct(d, int(py.get("agi", 0)))})
         d = int(tax.get("total_tax", 0)) - int(py.get("total_tax", 0))
-        obs.append({"id": "yoy_total_tax", "delta": d, "pct": _pct(d, int(py.get("total_tax", 0)))})
+        if int(tax.get("total_tax", 0)) or int(py.get("total_tax", 0)):  # nothing to say when both years are zero
+            obs.append({"id": "yoy_total_tax", "delta": d, "pct": _pct(d, int(py.get("total_tax", 0)))})
         prior_result = int(py.get("refund", 0)) - int(py.get("amount_owed", 0))
         cur_result = int(res.get("refund", 0)) - int(res.get("amount_owed", 0))
         obs.append({"id": "yoy_result", "delta": cur_result - prior_result, "pct": 0.0})

@@ -22,6 +22,7 @@ def strip_volatile(doc: dict) -> dict:
     d = json.loads(json.dumps(doc))
     d["meta"].pop("profile", None)
     d["prior_year"].pop("source", None)
+    d.pop("extras", None)  # penalty / Schedule A total / 2210 presence: checked by their own tests
     return d
 
 
