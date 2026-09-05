@@ -454,13 +454,26 @@ def verify(script: str, source_pdf: str, prior_pdf: str | None = None, profiles_
                 return False
         return True
 
-    federal_body = " ".join(s for _sl, s in sentences if not _is_state_sentence(s))
-    says_refund = re.search(r"\brefund", federal_body, re.I) is not None
-    says_owe = re.search(r"\b(owe|owes|owed|balance due|amount due)\b", federal_body, re.I) is not None
+    federal_sentences = [s for _sl, s in sentences if not _is_state_sentence(s)]
+    # "You don't owe anything" / "no balance due" / "no refund this year" are statements of the
+    # opposite direction, not claims of a balance due or a refund.
+    negated = re.compile(r"\b(no|not|n't|never|nothing|without|zero)\b(\W+\w+){0,3}?\W+(owe|owes|owed|owing|balance due|amount due|refund)", re.I)
+
+    def _asserts(pattern: str) -> str | None:
+        for s in federal_sentences:
+            stripped = negated.sub(" ", s)
+            if re.search(pattern, stripped, re.I):
+                return s
+        return None
+
+    refund_sentence = _asserts(r"\brefund")
+    owe_sentence = _asserts(r"\b(owe|owes|owed|balance due|amount due)\b")
+    says_refund = refund_sentence is not None
+    says_owe = owe_sentence is not None
     if says_refund and not refund_amt:
-        items.append(Item("direction", "refund", "flagged", "result", reason="script says refund but the return shows no refund"))
+        items.append(Item("direction", "refund", "flagged", "result", reason=f"script says refund but the return shows no refund: \"{refund_sentence[:120]}\""))
     elif says_owe and not owed_amt:
-        items.append(Item("direction", "balance due", "flagged", "result", reason="script says balance due but the return shows no amount owed"))
+        items.append(Item("direction", "balance due", "flagged", "result", reason=f"script says balance due but the return shows no amount owed: \"{owe_sentence[:120]}\""))
     elif not says_refund and not says_owe and (refund_amt or owed_amt):
         items.append(Item("direction", "-", "flagged", "result", reason="script never says whether this is a refund or a balance due"))
     else:

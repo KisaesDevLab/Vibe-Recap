@@ -146,3 +146,19 @@ def test_state_balance_due_without_state_name_is_not_federal_direction():
     bad = golden(case).replace("the return shows a federal refund of $4,900", "the return shows a federal balance due of $4,900")
     v = verify(bad, str(FIXTURES / f"cch-1040-2025-{case}.pdf"), None, str(PROFILES))
     assert any(k == "direction" for k, _, _ in flagged(v)), flagged(v)
+
+
+def test_negated_direction_phrases_are_not_direction_claims():
+    """'You don't owe anything' on a refund return states the same direction, not the opposite."""
+    case = "mfj-refund-mo"
+    script = golden(case).replace(
+        "[[slide:next]]",
+        "You do not owe anything to the IRS this year, and there is no balance due. [[slide:next]]",
+    )
+    v = verify(script, str(FIXTURES / f"ultratax-1040-2025-{case}.pdf"), None, str(PROFILES))
+    assert not any(k == "direction" for k, _, _ in flagged(v)), flagged(v)
+    # an actual claim of a balance due is still caught, and the reason quotes the sentence
+    bad = golden(case).replace("[[slide:next]]", "That leaves a balance due to the IRS. [[slide:next]]")
+    v = verify(bad, str(FIXTURES / f"ultratax-1040-2025-{case}.pdf"), None, str(PROFILES))
+    reasons = [r for k, _, r in flagged(v) if k == "direction"]
+    assert reasons and "That leaves a balance due" in reasons[0], flagged(v)
