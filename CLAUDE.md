@@ -4,7 +4,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Operational notes for Claude Code working in this repo. Read this first, then `docs/PLAN.md`, then `docs/PHASES.md`, then `STATE.md`.
 
-> **Current state (2026-09-05):** pre-Phase 1. The repo contains only docs. `PLAN.md` and `PHASES.md` currently sit at the repo root; Phase 1 deliverable 1 moves them to `docs/` and creates `STATE.md`, `QUESTIONS.md`, and `LICENSE`. The directory is not yet a git repository; run `git init` before the first Phase 1 commit.
+> **Current state (2026-09-05):** all nine phases built and verified; v0.1.0 tagged. Source is
+> public at `github.com/KisaesDevLab/Vibe-Recap`; images publish to GHCR from `.github/workflows/publish.yml`
+> on every push to `main` (`latest`, `sha-*`) and on `v*.*.*` tags. Read `STATE.md` for what changed after
+> the plan and `QUESTIONS.md` for every decision taken along the way.
 
 ## What this is
 
