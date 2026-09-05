@@ -33,6 +33,9 @@ real `qwen3:8b`: upload staged in 0.3 s, ingest through recon in 0.5 s, script a
 second attempt (2 m 40 s on this CPU), 23 verification items with 0 flagged, narration 38 s,
 slides 1.5 s, mux 18 s; a 122.7 s 1920x1080 H.264/AAC video reached `needs_review` 3 m 40 s
 after upload. Approve, release, and the package ZIP download then worked through the API.
+A second run after the router and appliance changes (CCH head-of-household fixture with Kansas
+and Missouri returns, local Ollama fallback since no router token): script accepted on the
+second attempt, 32 verification items with 0 flagged, 130.8 s video, `needs_review` in 4 minutes.
 Earlier runs on the same box surfaced and fixed: the 180 s model timeout (now 600 s), scripts
 under 250 words (prompt now states the target), an allowed observation delta being called the
 total tax (verifier now feeds back into the retry loop), and the "tax year exactly once" rule
