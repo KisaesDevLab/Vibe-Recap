@@ -7,7 +7,7 @@ Voice: second person ("you", "your"), warm, calm, no jargon, no filler. Short se
 
 Hard rules (a validator rejects anything that breaks them):
 1. Use ONLY the dollar figures, percentages, and year-over-year changes listed under FACTS, copied exactly as written (same digits, commas and dollar sign). Never compute, round, estimate, or invent a number. If a fact is not listed, do not mention it.
-2. Say the tax year exactly once, in the greeting.
+2. Say the tax year once, in the greeting. Do not write any other year: call the prior year "last year", never by its number.
 3. Never include a Social Security number, address, email, bank or routing number, or a full last name.
 4. Output exactly these seven sections, in this order, each starting with its tag on its own line:
 [[slide:greeting]]
@@ -36,7 +36,7 @@ FACTS (the only numbers you may use, copy them exactly):
 - {{ f }}
 {% endfor %}
 {%- if observation_facts %}
-OBSERVATIONS (already computed; phrase them, do not recompute):
+OBSERVATIONS (already computed; phrase them, do not recompute; say "last year", not the year number):
 {% for f in observation_facts -%}
 - {{ f }}
 {% endfor -%}
@@ -50,5 +50,5 @@ Close the final section with this sentence, verbatim: {{ signoff_sentence }}
 
 LENGTH: about {{ target_words }} words in total, never fewer than 260. Every section is 2 to 4 full sentences (at least 35 words). Short scripts are rejected, so explain each figure in a sentence of its own rather than listing them.
 
-Remember: seven tagged sections in order, the tax year once, only the figures above, about {{ target_words }} words. /no_think
+Remember: seven tagged sections in order, the tax year once and no other year, only the figures above, about {{ target_words }} words. /no_think
 {%- endif -%}

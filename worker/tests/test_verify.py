@@ -153,7 +153,7 @@ def test_negated_direction_phrases_are_not_direction_claims():
     case = "mfj-refund-mo"
     script = golden(case).replace(
         "[[slide:next]]",
-        "You do not owe anything to the IRS this year, and there is no balance due. [[slide:next]]",
+        "Your total tax owed was $14,153. You do not owe anything to the IRS this year, and there is no balance due. [[slide:next]]",
     )
     v = verify(script, str(FIXTURES / f"ultratax-1040-2025-{case}.pdf"), None, str(PROFILES))
     assert not any(k == "direction" for k, _, _ in flagged(v)), flagged(v)

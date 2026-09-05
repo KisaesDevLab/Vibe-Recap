@@ -459,9 +459,12 @@ def verify(script: str, source_pdf: str, prior_pdf: str | None = None, profiles_
     # opposite direction, not claims of a balance due or a refund.
     negated = re.compile(r"\b(no|not|n't|never|nothing|without|zero)\b(\W+\w+){0,3}?\W+(owe|owes|owed|owing|balance due|amount due|refund)", re.I)
 
+    # "total tax owed" describes the liability line, not a balance due.
+    liability = re.compile(r"\btax(es)? (owed|you owe|you owed)\b", re.I)
+
     def _asserts(pattern: str) -> str | None:
         for s in federal_sentences:
-            stripped = negated.sub(" ", s)
+            stripped = liability.sub(" ", negated.sub(" ", s))
             if re.search(pattern, stripped, re.I):
                 return s
         return None
