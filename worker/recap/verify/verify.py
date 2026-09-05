@@ -117,6 +117,7 @@ class ReturnFacts:
     prior: dict[str, int] = field(default_factory=dict)
     account_numbers: list[str] = field(default_factory=list)
     amount_index: dict[int, list[tuple[int, str]]] = field(default_factory=dict)  # value -> [(page, label)]
+    state_amounts: set[int] = field(default_factory=set)  # amounts printed on state return pages
 
 
 def _find_seq(words: list[Any], phrase: str) -> int | None:
@@ -238,6 +239,8 @@ def read_return(pages: list[VPage], prior_pages: list[VPage] | None, profiles_di
                     continue
                 label = " ".join(x.text for x in ln.words if x is not w)[:80]
                 f.amount_index.setdefault(abs(v), []).append((p.number, label))
+                if page_kind(p) == "state":
+                    f.state_amounts.add(abs(v))
     return f
 
 
@@ -435,7 +438,23 @@ def verify(script: str, source_pdf: str, prior_pdf: str | None = None, profiles_
     owed_amt = L.get("amount_owed", 0)
     # Only federal sentences count: a state balance due next to a federal refund is legitimate.
     state_word = re.compile(r"\bstate\b|" + "|".join(re.escape(n[0]) for n in state_names.values()) if state_names else r"\bstate\b", re.I)
-    federal_body = " ".join(s for _sl, s in sentences if not state_word.search(s))
+    # A sentence is a state sentence when it names a state, says "state", or every amount in it
+    # is printed on a state page and none on a federal page (e.g. "a small balance due of $120"
+    # following the Missouri sentence).
+    def _is_state_sentence(s: str) -> bool:
+        if state_word.search(s):
+            return True
+        amts = [abs(v) for tok, v in find_amount_tokens(s) if "$" in tok or "," in tok]
+        federal_pages = {p.number for p in pages if page_kind(p) == "f1040"}
+        if not amts:
+            return False
+        for a in amts:
+            on_federal = any(pg in federal_pages for pg, _l in facts.amount_index.get(a, []))
+            if on_federal or a not in facts.state_amounts:
+                return False
+        return True
+
+    federal_body = " ".join(s for _sl, s in sentences if not _is_state_sentence(s))
     says_refund = re.search(r"\brefund", federal_body, re.I) is not None
     says_owe = re.search(r"\b(owe|owes|owed|balance due|amount due)\b", federal_body, re.I) is not None
     if says_refund and not refund_amt:

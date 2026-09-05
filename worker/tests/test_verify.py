@@ -131,3 +131,18 @@ def test_filing_status_state_and_deduction_mismatches():
     assert any(k == "deduction_type" for k, _, _ in flagged(v))
     v = verify(golden("mfj-refund-mo").replace("your 2025 federal", "your 2024 federal"), pdf, None, str(PROFILES))
     assert any(k == "tax_year" for k, _, _ in flagged(v))
+
+
+def test_state_balance_due_without_state_name_is_not_federal_direction():
+    """HOH two-state fixture: federal refund, Kansas refund, Missouri balance due $120."""
+    case = "hoh-refund-two-states"
+    script = golden(case).replace(
+        "Missouri went the other way, with a small state balance due of $120.",
+        "Missouri went the other way. You also owe a small balance due of $120 there.",
+    )
+    v = verify(script, str(FIXTURES / f"cch-1040-2025-{case}.pdf"), None, str(PROFILES))
+    assert not any(k == "direction" for k, _, _ in flagged(v)), flagged(v)
+    # but a federal-looking balance-due sentence with a federal amount is still caught
+    bad = golden(case).replace("the return shows a federal refund of $4,900", "the return shows a federal balance due of $4,900")
+    v = verify(bad, str(FIXTURES / f"cch-1040-2025-{case}.pdf"), None, str(PROFILES))
+    assert any(k == "direction" for k, _, _ in flagged(v)), flagged(v)
