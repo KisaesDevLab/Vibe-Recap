@@ -1,0 +1,9 @@
+# Tailscale mode: certificate from the tailnet. Requires the tailscaled socket
+# mounted into the caddy container (see compose.override.example.yml) and
+# "MagicDNS" + "HTTPS certificates" enabled in the tailnet admin console.
+{$DOMAIN} {
+	tls {
+		get_certificate tailscale
+	}
+	import recap_routes
+}

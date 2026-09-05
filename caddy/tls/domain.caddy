@@ -1,0 +1,5 @@
+# Domain mode: public DNS name, certificate from Let's Encrypt via ACME.
+# Ports 80 and 443 must be reachable from the internet for the HTTP-01 challenge.
+{$DOMAIN} {
+	import recap_routes
+}

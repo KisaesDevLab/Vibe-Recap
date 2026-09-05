@@ -1,0 +1,12 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ink: #0f172a;
+  --color-brand: #1f3a5f;
+  --color-brand-strong: #162b47;
+  --color-accent: #e8b04b;
+  --color-paper: #f7f7f5;
+}
+
+html, body, #root { height: 100%; }
+body { @apply bg-paper text-ink antialiased; }

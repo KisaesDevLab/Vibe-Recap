@@ -1,0 +1,171 @@
+# Vibe Recap — single-host appliance stack.
+# `docker compose up --build` from a clean checkout brings up everything.
+#
+# Networks:
+#   frontend  caddy <-> web/api
+#   backend   internal only (no internet): api, worker, postgres, redis, ollama
+#   egress    internet access: caddy (ACME), api (licensing.kisaes.com only), ollama (model pulls)
+# The worker is attached to `backend` only, so it has no route to the internet.
+
+x-logging: &default-logging
+  driver: json-file
+  options: { max-size: "10m", max-file: "5" }
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      TLS_MODE: ${TLS_MODE:-lan}
+      DOMAIN: ${DOMAIN:-localhost}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./caddy/tls:/etc/caddy/tls:ro
+      - ${RECAP_DATA:-./data}/caddy:/data
+      - caddy_config:/config
+    networks: [frontend, egress]
+    depends_on: [web, api]
+    logging: *default-logging
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    image: ghcr.io/kisaesdevlab/vibe-recap-web:${RECAP_VERSION:-latest}
+    restart: unless-stopped
+    networks: [frontend]
+    logging: *default-logging
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    image: ghcr.io/kisaesdevlab/vibe-recap-api:${RECAP_VERSION:-latest}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      DATABASE_URL: postgres://${POSTGRES_USER:-recap}:${POSTGRES_PASSWORD:-change-me-before-first-run}@postgres:5432/${POSTGRES_DB:-recap}
+      REDIS_URL: redis://redis:6379
+      DATA_DIR: /data
+      OLLAMA_URL: ${OLLAMA_URL:-http://ollama:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3:8b}
+      OLLAMA_OCR_MODEL: ${OLLAMA_OCR_MODEL:-glm-ocr}
+      LICENSE_SERVER_URL: ${LICENSE_SERVER_URL:-https://licensing.kisaes.com}
+      MASTER_KEY_PASSPHRASE: ${MASTER_KEY_PASSPHRASE:-}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      TRUST_PROXY: "true"
+    volumes:
+      - ${RECAP_DATA:-./data}:/data
+    networks: [frontend, backend, egress]
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    logging: *default-logging
+
+  worker:
+    build:
+      context: .
+      dockerfile: worker/Dockerfile
+    image: ghcr.io/kisaesdevlab/vibe-recap-worker:${RECAP_VERSION:-latest}
+    restart: unless-stopped
+    shm_size: 1g
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-recap}:${POSTGRES_PASSWORD:-change-me-before-first-run}@postgres:5432/${POSTGRES_DB:-recap}
+      REDIS_URL: redis://redis:6379
+      DATA_DIR: /data
+      OLLAMA_URL: ${OLLAMA_URL:-http://ollama:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3:8b}
+      OLLAMA_OCR_MODEL: ${OLLAMA_OCR_MODEL:-glm-ocr}
+      MASTER_KEY_PASSPHRASE: ${MASTER_KEY_PASSPHRASE:-}
+      WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-1}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    volumes:
+      - ${RECAP_DATA:-./data}:/data
+      - worker_models:/models
+    networks: [backend]
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      api: { condition: service_healthy }
+    logging: *default-logging
+
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    environment:
+      OLLAMA_KEEP_ALIVE: 30m
+      OLLAMA_NUM_PARALLEL: "1"
+    volumes:
+      - ollama_models:/root/.ollama
+    networks: [backend, egress]
+    logging: *default-logging
+
+  ollama-init:
+    image: ollama/ollama:latest
+    restart: "no"
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        until ollama list >/dev/null 2>&1; do sleep 2; done
+        ollama pull ${OLLAMA_MODEL:-qwen3:8b}
+        ollama pull ${OLLAMA_OCR_MODEL:-glm-ocr} || echo "OCR model pull failed; OCR fallback unavailable until pulled"
+    networks: [backend]
+    depends_on: [ollama]
+    logging: *default-logging
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-recap}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-before-first-run}
+      POSTGRES_DB: ${POSTGRES_DB:-recap}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    networks: [backend]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-recap} -d ${POSTGRES_DB:-recap}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    logging: *default-logging
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--save", "60", "1", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    volumes:
+      - redis_data:/data
+    networks: [backend]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    logging: *default-logging
+
+networks:
+  frontend: {}
+  backend:
+    internal: true
+  egress: {}
+
+volumes:
+  caddy_config: {}
+  pg_data: {}
+  redis_data: {}
+  ollama_models: {}
+  worker_models: {}

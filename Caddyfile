@@ -1,0 +1,30 @@
+# Vibe Recap reverse proxy.
+# TLS_MODE selects one of caddy/tls/{lan,tailscale,domain}.caddy. Default: lan.
+{
+	admin off
+}
+
+(recap_routes) {
+	encode gzip zstd
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy no-referrer
+		Strict-Transport-Security "max-age=31536000"
+		-Server
+	}
+	handle /api/* {
+		reverse_proxy api:3000
+	}
+	handle /healthz {
+		reverse_proxy api:3000
+	}
+	handle /readyz {
+		reverse_proxy api:3000
+	}
+	handle {
+		reverse_proxy web:80
+	}
+}
+
+import /etc/caddy/tls/{$TLS_MODE:lan}.caddy

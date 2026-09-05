@@ -1,0 +1,44 @@
+# Copy to compose.override.yml and uncomment what you need. Compose merges it automatically.
+
+services:
+  # --- Use an Ollama already running on the host (e.g. the M6's existing install) ---
+  # Keeps the worker on the egress-denied network: the proxy is the only thing that can see the host.
+  # Also set in .env:  OLLAMA_URL=http://ollama-proxy:11434
+  # ollama-proxy:
+  #   image: alpine/socat:latest
+  #   restart: unless-stopped
+  #   command: ["TCP-LISTEN:11434,fork,reuseaddr", "TCP:host.docker.internal:11434"]
+  #   extra_hosts:
+  #     - "host.docker.internal:host-gateway"
+  #   networks: [backend, egress]
+  # ollama:
+  #   deploy:
+  #     replicas: 0
+  # ollama-init:
+  #   deploy:
+  #     replicas: 0
+
+  # --- Tailscale TLS mode: mount the tailscaled socket so Caddy can fetch a tailnet cert ---
+  # Also set in .env:  TLS_MODE=tailscale  DOMAIN=<machine>.<tailnet>.ts.net
+  # caddy:
+  #   volumes:
+  #     - /var/run/tailscale/tailscaled.sock:/var/run/tailscale/tailscaled.sock
+
+  # --- Optional Duplicati backup sidecar ---
+  # Back up ${RECAP_DATA} (blobs + keys) and a pg_dump. Blobs are useless without /data/keys.
+  # duplicati:
+  #   image: lscr.io/linuxserver/duplicati:latest
+  #   restart: unless-stopped
+  #   environment:
+  #     PUID: "1000"
+  #     PGID: "1000"
+  #     TZ: America/Chicago
+  #   volumes:
+  #     - duplicati_config:/config
+  #     - ${RECAP_DATA:-./data}:/source/recap-data:ro
+  #   ports:
+  #     - "127.0.0.1:8200:8200"
+  #   networks: [egress]
+
+# volumes:
+#   duplicati_config: {}

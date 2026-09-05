@@ -1,0 +1,10 @@
+# LAN mode: Caddy's internal CA issues a self-signed certificate.
+# Browsers will warn once; import /data/caddy/pki/authorities/local/root.crt to trust it.
+:80 {
+	redir https://{host}{uri} permanent
+}
+
+:443 {
+	tls internal
+	import recap_routes
+}
