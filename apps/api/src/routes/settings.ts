@@ -5,6 +5,7 @@ import { z } from "zod";
 import { actorOf, requireRole } from "../plugins/auth.js";
 import { audit } from "../services/audit.js";
 import { ollamaStatus } from "../services/ollama.js";
+import { registerTaskClasses } from "../services/airouter.js";
 import { getAllSettings, SETTING_DEFAULTS, setSetting, type SettingKey } from "../services/settings.js";
 import { badRequest } from "../errors.js";
 
@@ -15,6 +16,8 @@ const GENERAL_KEYS = [
   "color_secondary",
   "signoff_sentence",
   "voice",
+  "llm_provider",
+  "router_model",
   "model_name",
   "ollama_url",
   "temperature",
@@ -32,6 +35,8 @@ const generalBody = z.object({
   color_secondary: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
   signoff_sentence: z.string().max(300).optional(),
   voice: z.enum(["af_heart", "af_bella", "am_michael", "am_adam"]).optional(),
+  llm_provider: z.enum(["router", "ollama"]).optional(),
+  router_model: z.string().max(120).optional(),
   model_name: z.string().max(100).optional(),
   ollama_url: z.string().max(200).optional(),
   temperature: z.number().min(0).max(1.5).optional(),
@@ -84,7 +89,18 @@ export async function settingsRoutes(app: FastifyInstance) {
     const status = await ollamaStatus(url, 5000);
     const hasModel = status.models.some((m) => m === model || m.split(":")[0] === model.split(":")[0]);
     const hasOcr = status.models.some((m) => m.split(":")[0] === app.config.OLLAMA_OCR_MODEL.split(":")[0]);
-    return { url, model, reachable: status.reachable, models: status.models, hasModel, ocrModel: app.config.OLLAMA_OCR_MODEL, hasOcrModel: hasOcr };
+    const router = await registerTaskClasses(app);
+    return {
+      provider: s.llm_provider,
+      url,
+      model,
+      reachable: status.reachable,
+      models: status.models,
+      hasModel,
+      ocrModel: app.config.OLLAMA_OCR_MODEL,
+      hasOcrModel: hasOcr,
+      router: { configured: router.configured, url: router.url, reachable: router.reachable, registered: router.registered, error: router.error },
+    };
   });
 
   /** Export firm settings and form profiles as one JSON document (no client data, no keys). */

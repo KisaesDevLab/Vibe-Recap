@@ -5,8 +5,10 @@ UltraTax, Lacerte, CCH Axcess, GoSystem, Drake, or ProSeries); Recap extracts th
 writes a plain-English narrated video summary for the client, and lets the preparer review,
 approve, and download it for delivery through the firm's own channel.
 
-Everything runs on the firm's own hardware. The worker that reads returns has no internet route.
-No client data leaves the box.
+Everything runs on the firm's own hardware, and the worker that reads returns has no internet
+route. The return itself never leaves the box. Script generation goes through the Vibe AI Router
+by default, which sends only the extracted figures and first names to the firm's configured
+models under the router's data-boundary policy; the bundled local model remains a switch away.
 
 ![Dashboard](docs/screenshots/dashboard.png)
 

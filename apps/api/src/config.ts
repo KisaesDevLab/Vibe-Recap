@@ -18,6 +18,9 @@ const schema = z.object({
   LICENSE_SERVER_URL: z.string().default("https://licensing.kisaes.com"),
   /** Read-only enforcement when unlicensed. Defaults to on in production; set false for evaluation without a licensing server. */
   LICENSE_ENFORCE: bool.optional(),
+  /** Vibe AI Router (default script-generation provider). Empty token = bundled Ollama. */
+  VIBE_AI_ROUTER_URL: z.string().default("http://vibe-ai-router:8220"),
+  VIBE_AI_TOKEN: z.string().default(""),
   MASTER_KEY_PASSPHRASE: z.string().optional(),
   LOG_LEVEL: z.string().default("info"),
   COOKIE_SECURE: bool.default(true),
@@ -27,6 +30,10 @@ const schema = z.object({
   LOGIN_MAX_FAILURES: z.coerce.number().int().default(10),
   LOGIN_LOCKOUT_MINUTES: z.coerce.number().default(15),
   RECAP_VERSION: z.string().default("0.1.0"),
+  /** Run migrations at boot (default). The Vibe Appliance sets false and runs `migrate` explicitly. */
+  MIGRATIONS_AUTO: bool.default(true),
+  /** Comma-separated list of allowed Origin values for state-changing requests; empty = same-origin only. */
+  ALLOWED_ORIGIN: z.string().default(""),
 });
 
 export type Config = z.infer<typeof schema>;

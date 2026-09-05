@@ -20,6 +20,8 @@ class Config:
     models_dir: str
     profiles_dir: str
     ollama_timeout_s: float = 600.0
+    router_url: str = "http://airouter-proxy:8220"
+    router_token: str | None = None
 
     @staticmethod
     def from_env(env: dict[str, str] | None = None) -> "Config":
@@ -37,4 +39,6 @@ class Config:
             models_dir=e.get("MODELS_DIR", "/models"),
             profiles_dir=e.get("FORM_PROFILES_DIR", os.path.join(os.path.dirname(__file__), "..", "..", "form-profiles")),
             ollama_timeout_s=float(e.get("OLLAMA_TIMEOUT_S", "600") or 600),
+            router_url=e.get("VIBE_AI_ROUTER_URL", "http://airouter-proxy:8220").rstrip("/"),
+            router_token=e.get("VIBE_AI_TOKEN") or None,
         )

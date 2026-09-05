@@ -38,6 +38,15 @@ under 250 words (prompt now states the target), an allowed observation delta bei
 total tax (verifier now feeds back into the retry loop), and the "tax year exactly once" rule
 (relaxed, Q36). Screenshots in `docs/screenshots/` come from this run.
 
+## Q&A outcomes and post-plan work (2026-09-05)
+
+- Vibe AI Router is the default script provider (Q37); bundled Ollama is the local option. The
+  worker reaches the router only through a socat relay so it never joins a network with an
+  internet route. `recap_script` is registered by the API at startup.
+- Licensing is informational until the server exists (`LICENSE_ENFORCE=false`, Q35).
+- Vibe Appliance packaging lives in `.appliance/` (Q38); the two appliance-repo edits it needs
+  are listed there. Not yet exercised on an appliance host.
+
 ## Deviations from the plan
 
 - Phase 2: the "kill the worker mid-job, the rest continue" test is deferred to Phase 3 where the

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Vibe Recap">
+  <rect x="4" y="10" width="56" height="44" rx="8" fill="#1f3a5f"/>
+  <rect x="4" y="10" width="56" height="6" rx="3" fill="#e8b04b"/>
+  <polygon points="26,22 26,44 44,33" fill="#f7f7f5"/>
+  <rect x="12" y="48" width="40" height="3" rx="1.5" fill="#e8b04b" opacity="0.9"/>
+</svg>

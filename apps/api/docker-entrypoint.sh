@@ -12,6 +12,7 @@ cd /app/apps/api
 case "$1" in
   serve|"") exec node dist/index.js ;;
   seed-admin) shift; exec node dist/cli/seed-admin.js "$@" ;;
+  migrate) shift; exec node dist/cli/migrate.js "$@" ;;
   rotate-master-key) shift; exec node dist/cli/rotate-master-key.js "$@" ;;
   *) exec "$@" ;;
 esac

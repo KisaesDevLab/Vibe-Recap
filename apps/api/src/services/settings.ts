@@ -10,6 +10,8 @@ export const SETTING_DEFAULTS = {
   color_secondary: "#e8b04b",
   signoff_sentence: "We look forward to reviewing this with you.",
   voice: "af_heart",
+  llm_provider: "router" as "router" | "ollama", // Q37: Vibe AI Router by default, bundled Ollama as the local option
+  router_model: "" as string, // advisory; the router's policy decides what serves
   ollama_url: "" as string, // empty = use OLLAMA_URL env
   model_name: "" as string, // empty = use OLLAMA_MODEL env
   temperature: 0.3,

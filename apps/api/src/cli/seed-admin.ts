@@ -13,10 +13,11 @@ import { checkPasswordPolicy, hashPassword } from "../auth/password.js";
 import { audit } from "../services/audit.js";
 
 async function main() {
+  // Positional args, then ADMIN_*, then the Vibe Appliance's SEED_ADMIN_* conventions.
   const [email, name, password] = [
-    process.argv[2] ?? process.env.ADMIN_EMAIL,
-    process.argv[3] ?? process.env.ADMIN_NAME ?? "Administrator",
-    process.argv[4] ?? process.env.ADMIN_PASSWORD,
+    process.argv[2] ?? process.env.ADMIN_EMAIL ?? process.env.SEED_ADMIN_EMAIL,
+    process.argv[3] ?? process.env.ADMIN_NAME ?? process.env.SEED_ADMIN_NAME ?? "Administrator",
+    process.argv[4] ?? process.env.ADMIN_PASSWORD ?? process.env.SEED_ADMIN_PASSWORD,
   ];
   if (!email || !password) {
     console.error("usage: seed-admin <email> <name> <password>   (or ADMIN_EMAIL / ADMIN_NAME / ADMIN_PASSWORD env)");
@@ -32,9 +33,10 @@ async function main() {
   await runMigrations(db);
   const [row] = await db.select({ n: count() }).from(users);
   if ((row?.n ?? 0) > 0) {
-    console.error("users already exist; use /settings/users to add more");
+    // Idempotent for orchestrators that re-run the seed on every enable.
+    console.log("users already exist; nothing to seed (use /settings/users to add more)");
     await close();
-    process.exit(1);
+    process.exit(0);
   }
   const [u] = await db
     .insert(users)

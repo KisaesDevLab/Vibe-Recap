@@ -33,6 +33,12 @@ Positioning inside the Vibe suite: a **standalone appliance** with its own UI, u
 | L22 | Batch upload: many PDFs (or a ZIP of PDFs) in one action; each PDF becomes its own independent job. Client is auto-matched from the taxpayer name on the return and confirmed by the preparer before the batch is queued. Jobs process serially; one failure never blocks the others. | Kurt 2026-09-03. |
 | L13 | PolyForm Small Business License 1.0.0; licensed via `licensing.kisaes.com`; distributed via GHCR. | Same as the rest of the suite. |
 
+**Amendment 2026-09-05 (Kurt, Q&A):** L4 and L12 are amended. Script generation goes through the
+Vibe AI Router (`http://vibe-ai-router:8220` on `vibe_net`, task class `recap_script`) by default,
+serving DigitalOcean serverless open-source models under the router's data-boundary policy; the
+bundled Ollama stays available as the local provider. The worker's egress is the router and Ollama,
+nothing else. See QUESTIONS.md Q37.
+
 ## 3. Architecture
 
 ```

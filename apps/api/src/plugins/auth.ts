@@ -31,6 +31,20 @@ async function authPlugin(app: FastifyInstance, opts: AuthPluginOptions) {
     req.auth = await loadSession(app.db, sid, opts.policy);
   });
 
+  // Origin allow-list (Vibe Appliance item 2): when ALLOWED_ORIGIN is set, state-changing
+  // browser requests must carry one of the listed origins. Comma-separated; blank = same-origin
+  // only, which the SameSite=Strict cookie already enforces.
+  const allowedOrigins = app.config.ALLOWED_ORIGIN.split(",").map((s) => s.trim().replace(/\/$/, "")).filter(Boolean);
+  app.addHook("onRequest", async (req, reply) => {
+    if (!allowedOrigins.length || !STATE_CHANGING.has(req.method)) return;
+    const origin = req.headers.origin;
+    if (!origin) return; // non-browser clients (no Origin header) are governed by the session + CSRF checks
+    if (!allowedOrigins.includes(origin.replace(/\/$/, ""))) {
+      reply.code(403);
+      throw forbidden("Origin not allowed");
+    }
+  });
+
   // CSRF: double-submit header must equal the per-session token on every state-changing request.
   app.addHook("preHandler", async (req, reply) => {
     if (!STATE_CHANGING.has(req.method)) return;

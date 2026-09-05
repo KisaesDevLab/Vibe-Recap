@@ -101,6 +101,32 @@ Settings > Retention: how long source PDFs, scripts, and videos stay. Defaults 3
 Settings > License: paste the key from your Kisaes order. Without it the app is read-only.
 Settings > Users: add preparers and staff; invite links are valid for 24 hours.
 
+## 6a. Vibe AI Router (default script provider)
+
+Scripts are generated through the Vibe AI Router, which serves the firm's configured models
+(DigitalOcean serverless open-source models by default in the Vibe suite) under its
+data-boundary policy. Only the extracted figures, first names, filing status, states, and the
+preparer's note are sent; the return PDF never leaves the box.
+
+1. In the router console, mint an app token for `vibe-recap` (App tokens) and put it in `.env`
+   as `VIBE_AI_TOKEN`.
+2. The router lives on the Docker network `vibe_net`. On the Vibe Appliance it already exists;
+   on a standalone host run `docker network create vibe_net` once and start the router stack on it.
+3. Start Recap. The API registers the task class `recap_script`, which begins `local_only`.
+   Widen it in the router console (Policies) to allow the cloud models you want.
+4. Settings > General > *Test connections* shows the router state and the class's sensitivity.
+
+Without a token, or with *Bundled Ollama* selected, scripts are generated locally by `qwen3:8b`.
+
+## 6b. Installing on the Vibe Appliance
+
+Recap ships the appliance manifest, compose overlay, and env template under `.appliance/`.
+Once they are in the appliance repo (`console/manifests/vibe-recap.json`, `apps/vibe-recap.yml`,
+`env-templates/per-app/vibe-recap.env.tmpl`) and the images are on GHCR, enable it from the
+console's Apps panel or `vibe enable vibe-recap`. The appliance provides Postgres, Redis, TLS,
+the AI Router token, and the first admin's password (First-login card). Recap's own `compose.yml`
+is for standalone hosts only.
+
 ## 7. Using an Ollama already running on the host
 
 Keep the worker offline and route it through a tiny proxy that only reaches the host's Ollama:

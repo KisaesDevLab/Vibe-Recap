@@ -203,12 +203,33 @@ def generate(
 
 
 def _client_for(ctx: Any) -> Ollama:
+    """Provider selection (Q37): the Vibe AI Router by default when an app token is present,
+    the bundled Ollama when `llm_provider` is `ollama` or no token is configured."""
+    from .router import Router
+
     s = ctx.settings or {}
+    provider = (s.get("llm_provider") or "router").lower()
+    timeout = float(s.get("ollama_timeout_s") or ctx.cfg.ollama_timeout_s)
+    temperature = float(s.get("temperature", 0.3) or 0.3)
+    if provider == "router" and ctx.cfg.router_token:
+        job = ctx.job or {}
+        return Router(
+            ctx.cfg.router_url,
+            ctx.cfg.router_token,
+            model=(s.get("router_model") or None),
+            temperature=temperature,
+            timeout_s=timeout,
+            user_id=str(job.get("uploaded_by") or "") or None,
+            client_ref=str(job.get("client_id") or "") or None,
+            engagement_ref=str(job.get("id") or "") or None,
+        )
+    if provider == "router" and not ctx.cfg.router_token and ctx.log:
+        ctx.log.warning("llm_provider is router but VIBE_AI_TOKEN is empty; using the bundled Ollama")
     return Ollama(
         (s.get("ollama_url") or ctx.cfg.ollama_url),
         (s.get("model_name") or ctx.cfg.ollama_model),
-        temperature=float(s.get("temperature", 0.3) or 0.3),
-        timeout_s=float(s.get("ollama_timeout_s") or ctx.cfg.ollama_timeout_s),
+        temperature=temperature,
+        timeout_s=timeout,
     )
 
 

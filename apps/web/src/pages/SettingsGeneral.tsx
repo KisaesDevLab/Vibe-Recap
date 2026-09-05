@@ -11,6 +11,8 @@ interface GeneralResponse {
     color_secondary: string;
     signoff_sentence: string;
     voice: string;
+    llm_provider: "router" | "ollama";
+    router_model: string;
     model_name: string;
     ollama_url: string;
     temperature: number;
@@ -30,7 +32,15 @@ export function SettingsGeneralPage() {
   const [msg, setMsg] = useState<{ kind: "error" | "success" | "info"; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [logo, setLogo] = useState<string | null | undefined>(undefined);
-  const [ollama, setOllama] = useState<{ reachable: boolean; hasModel: boolean; hasOcrModel: boolean; models: string[]; url: string; model: string } | null>(null);
+  const [ollama, setOllama] = useState<{
+    reachable: boolean;
+    hasModel: boolean;
+    hasOcrModel: boolean;
+    models: string[];
+    url: string;
+    model: string;
+    router: { configured: boolean; url: string; reachable: boolean; registered: Array<{ key: string; sensitivity: string }> | null; error: string | null };
+  } | null>(null);
 
   if (loading && !data) return <Spinner />;
   if (error || !data) return <Alert kind="error">{error ?? "Could not load"}</Alert>;
@@ -45,6 +55,8 @@ export function SettingsGeneralPage() {
       color_secondary: fd.get("color_secondary"),
       signoff_sentence: fd.get("signoff_sentence"),
       voice: fd.get("voice"),
+      llm_provider: fd.get("llm_provider"),
+      router_model: fd.get("router_model"),
       model_name: fd.get("model_name"),
       ollama_url: fd.get("ollama_url"),
       temperature: Number(fd.get("temperature")),
@@ -141,6 +153,15 @@ export function SettingsGeneralPage() {
         </Card>
         <Card title="Language model and processing">
           <div className="space-y-3">
+            <Field label="Script generation provider" hint="Vibe AI Router serves the firm's configured cloud or local models under the router's data-boundary policy; only the extracted figures and first names are sent, never the PDF. Bundled Ollama keeps everything on this box.">
+              <Select name="llm_provider" defaultValue={s.llm_provider}>
+                <option value="router">Vibe AI Router (task class recap_script)</option>
+                <option value="ollama">Bundled Ollama (local only)</option>
+              </Select>
+            </Field>
+            <Field label="Router model (advisory)" hint="The router's policy decides what serves; leave blank to accept its default for recap_script.">
+              <Input name="router_model" defaultValue={s.router_model} placeholder="policy default" />
+            </Field>
             <Field label="Ollama URL" hint={`Blank uses ${data.defaults.ollama_url}`}>
               <Input name="ollama_url" defaultValue={s.ollama_url} placeholder={data.defaults.ollama_url} />
             </Field>
@@ -167,10 +188,13 @@ export function SettingsGeneralPage() {
             <p className="text-xs text-slate-500">{data.note}</p>
             <div className="flex items-center gap-2">
               <Button type="button" variant="secondary" disabled={busy} onClick={() => testOllama(document.getElementById("general") as HTMLFormElement)}>
-                Test Ollama
+                Test connections
               </Button>
-              {ollama && (
-                <span className="text-xs">
+            </div>
+            {ollama && (
+              <div className="space-y-1 text-xs">
+                <div>
+                  <strong>Ollama:</strong>{" "}
                   {ollama.reachable ? (
                     <>
                       reachable at {ollama.url}; model {ollama.model} {ollama.hasModel ? "present" : "MISSING"}; OCR model {ollama.hasOcrModel ? "present" : "missing"}
@@ -178,9 +202,22 @@ export function SettingsGeneralPage() {
                   ) : (
                     <span className="text-red-700">not reachable at {ollama.url}</span>
                   )}
-                </span>
-              )}
-            </div>
+                </div>
+                <div>
+                  <strong>AI Router:</strong>{" "}
+                  {!ollama.router.configured ? (
+                    <span className="text-amber-700">no app token (VIBE_AI_TOKEN); scripts use the bundled Ollama</span>
+                  ) : ollama.router.error ? (
+                    <span className="text-red-700">{ollama.router.error}</span>
+                  ) : (
+                    <>
+                      reachable at {ollama.router.url}; task classes {ollama.router.registered?.map((r) => `${r.key} (${r.sensitivity})`).join(", ")}
+                      {ollama.router.registered?.some((r) => r.sensitivity === "local_only") && " — widen recap_script in the router console to use cloud models"}
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </Card>
         <div className="lg:col-span-2">

@@ -25,7 +25,7 @@
 		reverse_proxy api:3000
 	}
 	handle {
-		reverse_proxy web:80
+		reverse_proxy web:8080
 	}
 }
 

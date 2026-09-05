@@ -55,14 +55,16 @@ services:
       OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3:8b}
       OLLAMA_OCR_MODEL: ${OLLAMA_OCR_MODEL:-glm-ocr}
       LICENSE_SERVER_URL: ${LICENSE_SERVER_URL:-https://licensing.kisaes.com}
-      LICENSE_ENFORCE: ${LICENSE_ENFORCE:-true}
+      LICENSE_ENFORCE: ${LICENSE_ENFORCE:-false}
+      VIBE_AI_ROUTER_URL: ${VIBE_AI_ROUTER_URL:-http://vibe-ai-router:8220}
+      VIBE_AI_TOKEN: ${VIBE_AI_TOKEN:-}
       MASTER_KEY_PASSPHRASE: ${MASTER_KEY_PASSPHRASE:-}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       COOKIE_SECURE: ${COOKIE_SECURE:-true}
       TRUST_PROXY: "true"
     volumes:
       - ${RECAP_DATA:-./data}:/data
-    networks: [frontend, backend, egress]
+    networks: [frontend, backend, egress, vibe_net]
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
@@ -89,17 +91,30 @@ services:
       OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3:8b}
       OLLAMA_OCR_MODEL: ${OLLAMA_OCR_MODEL:-glm-ocr}
       OLLAMA_TIMEOUT_S: ${OLLAMA_TIMEOUT_S:-600}
+      VIBE_AI_ROUTER_URL: http://airouter-proxy:8220
+      VIBE_AI_TOKEN: ${VIBE_AI_TOKEN:-}
       MASTER_KEY_PASSPHRASE: ${MASTER_KEY_PASSPHRASE:-}
       WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-1}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       FORM_PROFILES_DIR: /data/form-profiles
     volumes:
       - ${RECAP_DATA:-./data}:/data
+    # backend has no internet. The AI Router is reached through airouter-proxy, so the worker
+    # never joins a network with an internet route; its only AI endpoints are the router and Ollama.
     networks: [backend]
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
       api: { condition: service_healthy }
+    logging: *default-logging
+
+  # TCP relay from the egress-denied backend network to the Vibe AI Router on vibe_net.
+  # It forwards one port to one host and nothing else.
+  airouter-proxy:
+    image: alpine/socat:latest
+    restart: unless-stopped
+    command: ["TCP-LISTEN:8220,fork,reuseaddr", "TCP:${VIBE_AI_ROUTER_HOST:-vibe-ai-router}:8220"]
+    networks: [backend, vibe_net]
     logging: *default-logging
 
   ollama:
@@ -164,6 +179,10 @@ networks:
   backend:
     internal: true
   egress: {}
+  # The Vibe appliance's shared network where vibe-ai-router lives. Create it once on a
+  # standalone host: `docker network create vibe_net`.
+  vibe_net:
+    external: true
 
 volumes:
   caddy_config: {}

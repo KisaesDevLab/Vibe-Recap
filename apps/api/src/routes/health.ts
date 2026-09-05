@@ -9,6 +9,19 @@ export async function healthRoutes(app: FastifyInstance) {
     return { ok: true, version: app.config.RECAP_VERSION };
   });
 
+  // Vibe Appliance convention: 200 only when fully ready (Postgres migrated, Redis up).
+  app.get("/api/v1/health", { config: { auth: false } }, async (_req, reply) => {
+    const [postgres, redis] = await Promise.all([
+      app.db
+        .execute(sql`select 1 from users limit 0`)
+        .then(() => true)
+        .catch(() => false),
+      redisHealthy(app.redis),
+    ]);
+    reply.code(postgres && redis ? 200 : 503);
+    return { ok: postgres && redis, version: app.config.RECAP_VERSION, checks: { postgres, redis } };
+  });
+
   app.get("/readyz", { config: { auth: false } }, async (_req, reply): Promise<ReadyResponse> => {
     const [postgres, redis, ollama] = await Promise.all([
       app.db
