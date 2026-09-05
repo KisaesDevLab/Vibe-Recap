@@ -12,6 +12,11 @@ import { ClientDetailPage, ClientsPage } from "./pages/Clients";
 import { JobPage } from "./pages/Job";
 import { SettingsLayout } from "./pages/Settings";
 import { SettingsRetentionPage } from "./pages/SettingsRetention";
+import { SettingsGeneralPage } from "./pages/SettingsGeneral";
+import { SettingsUsersPage } from "./pages/SettingsUsers";
+import { SettingsAuditPage } from "./pages/SettingsAudit";
+import { SettingsBackupPage, SettingsLicensePage } from "./pages/SettingsLicenseBackup";
+import { InvitePage } from "./pages/Invite";
 import { Alert, Spinner } from "./ui";
 
 function RequireAuth({ children }: { children: ReactNode }) {
@@ -40,6 +45,7 @@ export function App() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/setup" element={<SetupPage />} />
+      <Route path="/invite/:token" element={<InvitePage />} />
       <Route
         element={
           <RequireAuth>
@@ -82,8 +88,13 @@ export function App() {
             </RequireRole>
           }
         >
-          <Route index element={<Navigate to="/settings/retention" replace />} />
+          <Route index element={<Navigate to="/settings/general" replace />} />
+          <Route path="general" element={<SettingsGeneralPage />} />
           <Route path="retention" element={<SettingsRetentionPage />} />
+          <Route path="users" element={<SettingsUsersPage />} />
+          <Route path="audit" element={<SettingsAuditPage />} />
+          <Route path="license" element={<SettingsLicensePage />} />
+          <Route path="backup" element={<SettingsBackupPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

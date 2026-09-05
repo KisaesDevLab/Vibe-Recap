@@ -90,6 +90,7 @@ services:
       MASTER_KEY_PASSPHRASE: ${MASTER_KEY_PASSPHRASE:-}
       WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-1}
       LOG_LEVEL: ${LOG_LEVEL:-info}
+      FORM_PROFILES_DIR: /data/form-profiles
     volumes:
       - ${RECAP_DATA:-./data}:/data
     networks: [backend]

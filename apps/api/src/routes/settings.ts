@@ -1,0 +1,140 @@
+import type { FastifyInstance } from "fastify";
+import { promises as fs } from "node:fs";
+import path from "node:path";
+import { z } from "zod";
+import { actorOf, requireRole } from "../plugins/auth.js";
+import { audit } from "../services/audit.js";
+import { ollamaStatus } from "../services/ollama.js";
+import { getAllSettings, SETTING_DEFAULTS, setSetting, type SettingKey } from "../services/settings.js";
+import { badRequest } from "../errors.js";
+
+const GENERAL_KEYS = [
+  "firm_name",
+  "firm_logo",
+  "color_primary",
+  "color_secondary",
+  "signoff_sentence",
+  "voice",
+  "model_name",
+  "ollama_url",
+  "temperature",
+  "ollama_timeout_s",
+  "target_words",
+  "concurrency",
+  "ocr_enabled",
+  "greeting_use_first_names",
+] as const satisfies readonly SettingKey[];
+
+const generalBody = z.object({
+  firm_name: z.string().max(120).optional(),
+  firm_logo: z.string().max(280_000).nullable().optional(), // data: URL, <= ~200 KB
+  color_primary: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+  color_secondary: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+  signoff_sentence: z.string().max(300).optional(),
+  voice: z.enum(["af_heart", "af_bella", "am_michael", "am_adam"]).optional(),
+  model_name: z.string().max(100).optional(),
+  ollama_url: z.string().max(200).optional(),
+  temperature: z.number().min(0).max(1.5).optional(),
+  ollama_timeout_s: z.number().int().min(60).max(3600).optional(),
+  target_words: z.number().int().min(250).max(450).optional(),
+  concurrency: z.number().int().min(1).max(4).optional(),
+  ocr_enabled: z.boolean().optional(),
+  greeting_use_first_names: z.boolean().optional(),
+});
+
+export const VOICES = { af_heart: "Heart (female)", af_bella: "Bella (female)", am_michael: "Michael (male)", am_adam: "Adam (male)" };
+
+function profilesDir(app: FastifyInstance): string {
+  return path.join(app.config.DATA_DIR, "form-profiles");
+}
+
+export async function settingsRoutes(app: FastifyInstance) {
+  app.get("/api/settings/general", { preHandler: requireRole("admin") }, async () => {
+    const s = await getAllSettings(app.db);
+    return {
+      settings: Object.fromEntries(GENERAL_KEYS.map((k) => [k, s[k]])),
+      defaults: { ollama_url: app.config.OLLAMA_URL, model_name: app.config.OLLAMA_MODEL, ocr_model: app.config.OLLAMA_OCR_MODEL },
+      voices: VOICES,
+      note: "Concurrency takes effect when the worker container restarts (docker compose restart worker).",
+    };
+  });
+
+  app.put("/api/settings/general", { preHandler: requireRole("admin") }, async (req) => {
+    const body = generalBody.parse(req.body);
+    if (body.firm_logo && !/^data:image\/(png|jpeg|svg\+xml|webp);base64,/.test(body.firm_logo)) throw badRequest("Logo must be a PNG, JPEG, SVG, or WebP data URL");
+    const user = req.auth!.user;
+    const changed: string[] = [];
+    for (const k of GENERAL_KEYS) {
+      const v = body[k as keyof typeof body];
+      if (v === undefined) continue;
+      await setSetting(app.db, k, v as never, user.id);
+      changed.push(k);
+    }
+    await audit(app.db, { actor: actorOf(req), action: "settings.update", target: { type: "settings", id: "general" }, ip: req.ip, meta: { keys: changed } });
+    const s = await getAllSettings(app.db);
+    return { settings: Object.fromEntries(GENERAL_KEYS.map((k) => [k, s[k]])) };
+  });
+
+  /** "Test Ollama": reachability and model presence, using the saved URL/model or the env defaults. */
+  app.post("/api/settings/test-ollama", { preHandler: requireRole("admin") }, async (req) => {
+    const body = z.object({ ollama_url: z.string().max(200).optional(), model_name: z.string().max(100).optional() }).parse(req.body ?? {});
+    const s = await getAllSettings(app.db);
+    const url = body.ollama_url || s.ollama_url || app.config.OLLAMA_URL;
+    const model = body.model_name || s.model_name || app.config.OLLAMA_MODEL;
+    const status = await ollamaStatus(url, 5000);
+    const hasModel = status.models.some((m) => m === model || m.split(":")[0] === model.split(":")[0]);
+    const hasOcr = status.models.some((m) => m.split(":")[0] === app.config.OLLAMA_OCR_MODEL.split(":")[0]);
+    return { url, model, reachable: status.reachable, models: status.models, hasModel, ocrModel: app.config.OLLAMA_OCR_MODEL, hasOcrModel: hasOcr };
+  });
+
+  /** Export firm settings and form profiles as one JSON document (no client data, no keys). */
+  app.get("/api/settings/backup/export", { preHandler: requireRole("admin") }, async (req, reply) => {
+    const s = await getAllSettings(app.db);
+    const { license_key: _omit, ...settings } = s;
+    const profiles: Record<string, string> = {};
+    try {
+      for (const name of await fs.readdir(profilesDir(app))) {
+        if (name.endsWith(".yaml")) profiles[name] = await fs.readFile(path.join(profilesDir(app), name), "utf8");
+      }
+    } catch {
+      /* profiles not seeded yet */
+    }
+    await audit(app.db, { actor: actorOf(req), action: "settings.export", ip: req.ip, meta: { profiles: Object.keys(profiles).length } });
+    reply.header("content-type", "application/json");
+    reply.header("content-disposition", `attachment; filename="vibe-recap-settings-${new Date().toISOString().slice(0, 10)}.json"`);
+    return { version: 1, exportedAt: new Date().toISOString(), settings, profiles };
+  });
+
+  app.post("/api/settings/backup/import", { preHandler: requireRole("admin") }, async (req) => {
+    const body = z
+      .object({
+        mode: z.enum(["merge", "replace"]).default("merge"),
+        settings: z.record(z.string(), z.unknown()).optional(),
+        profiles: z.record(z.string(), z.string()).optional(),
+      })
+      .parse(req.body);
+    const user = req.auth!.user;
+    const applied: string[] = [];
+    const keys = body.mode === "replace" ? (Object.keys(SETTING_DEFAULTS) as SettingKey[]) : (Object.keys(body.settings ?? {}) as SettingKey[]);
+    for (const k of keys) {
+      if (!(k in SETTING_DEFAULTS) || k === "license_key") continue;
+      const v = body.settings && k in body.settings ? body.settings[k] : SETTING_DEFAULTS[k];
+      await setSetting(app.db, k, v as never, user.id);
+      applied.push(k);
+    }
+    let profilesWritten = 0;
+    if (body.profiles) {
+      await fs.mkdir(profilesDir(app), { recursive: true });
+      if (body.mode === "replace") {
+        for (const name of await fs.readdir(profilesDir(app))) if (name.endsWith(".yaml")) await fs.rm(path.join(profilesDir(app), name));
+      }
+      for (const [name, content] of Object.entries(body.profiles)) {
+        if (!/^[A-Za-z0-9_.-]+\.yaml$/.test(name)) throw badRequest(`Bad profile name ${name}`);
+        await fs.writeFile(path.join(profilesDir(app), name), content, "utf8");
+        profilesWritten++;
+      }
+    }
+    await audit(app.db, { actor: actorOf(req), action: "settings.import", ip: req.ip, meta: { mode: body.mode, keys: applied, profiles: profilesWritten } });
+    return { ok: true, settings: applied.length, profiles: profilesWritten };
+  });
+}

@@ -185,6 +185,7 @@ def _client_for(ctx: Any) -> Ollama:
         (s.get("ollama_url") or ctx.cfg.ollama_url),
         (s.get("model_name") or ctx.cfg.ollama_model),
         temperature=float(s.get("temperature", 0.3) or 0.3),
+        timeout_s=float(s.get("ollama_timeout_s") or ctx.cfg.ollama_timeout_s),
     )
 
 

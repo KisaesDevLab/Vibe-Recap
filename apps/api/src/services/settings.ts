@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import type { Db } from "../db/index.js";
 import { settings } from "../db/schema.js";
 
@@ -13,6 +13,7 @@ export const SETTING_DEFAULTS = {
   ollama_url: "" as string, // empty = use OLLAMA_URL env
   model_name: "" as string, // empty = use OLLAMA_MODEL env
   temperature: 0.3,
+  ollama_timeout_s: 600,
   target_words: 350,
   concurrency: 1,
   ocr_enabled: true,
@@ -45,8 +46,10 @@ export async function setSetting<K extends SettingKey>(
   value: SettingsMap[K],
   updatedBy: string | null,
 ): Promise<void> {
+  // JSON null must land as the jsonb value 'null', not SQL NULL (the column is NOT NULL).
+  const json = sql`${JSON.stringify(value ?? null)}::jsonb`;
   await db
     .insert(settings)
-    .values({ key, value: value as unknown, updatedAt: new Date(), updatedBy })
-    .onConflictDoUpdate({ target: settings.key, set: { value: value as unknown, updatedAt: new Date(), updatedBy } });
+    .values({ key, value: json, updatedAt: new Date(), updatedBy })
+    .onConflictDoUpdate({ target: settings.key, set: { value: json, updatedAt: new Date(), updatedBy } });
 }

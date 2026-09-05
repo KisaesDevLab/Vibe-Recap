@@ -152,6 +152,7 @@ Never commit a real tax return. `tests/fixtures/` contains synthetic 1040 packag
 
 - **Ollama `num_ctx` defaults to 4096.** Set `num_ctx: 16384` in every request. The script prompt with a full extraction JSON exceeds 4k.
 - **Qwen3 emits `<think>` blocks.** Strip them before validation. Prefer `/no_think` in the system prompt.
+- **One script attempt can take minutes on CPU.** The prompt is ~1,500 tokens and the answer ~500; on the M6 that is a couple of minutes per attempt, on a laptop VM longer. The Ollama timeout is a setting (`ollama_timeout_s`, default 600); a 180 s timeout fails every job at `script`.
 - **pdfplumber on Lacerte output** reports overlapping words on some lines; use `extract_words(use_text_flow=True)` and cluster by `top` before joining.
 - **UltraTax prints line labels and values in separate text runs.** Match by y-coordinate band, not by adjacency in the text stream.
 - **Playwright in Docker** needs `--no-sandbox` and `shm_size: 1g` or Chromium will crash on the second render.

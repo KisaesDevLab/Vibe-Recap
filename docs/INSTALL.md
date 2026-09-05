@@ -1,64 +1,149 @@
 # Installing Vibe Recap
 
-Draft for Phase 1. Final version lands in Phase 9.
+From a fresh Ubuntu Server 24.04 host to a released recap video in under 20 minutes, not counting
+the one-time model download.
 
-## Prerequisites
+## 1. Prerequisites
 
-- Ubuntu Server 24.04 (or any Linux host with Docker Engine 27+ and Docker Compose v2)
-- 6 CPU cores, 32 GB RAM, 60 GB free disk (models take ~6 GB; videos and PDFs use the rest)
-- Ports 80 and 443 free on the host
-- Optional: Tailscale on the host if you want tailnet TLS
+| Item | Requirement |
+|---|---|
+| Host | Ubuntu Server 24.04 (any Linux with Docker works). Reference box: GMKtec NucBox M6, Ryzen 5 6600H, 32 GB. |
+| Docker | Docker Engine 27+ with the Compose plugin (`docker compose version` prints v2.x). |
+| Disk | 60 GB free. Images are about 5 GB, the language model 5 GB, the rest is your returns and videos. |
+| Ports | 80 and 443 free on the host. |
+| Network | Outbound HTTPS from the host for the first pull only (images, language model). The worker never has internet access. |
+| Optional | Tailscale on the host if the firm reaches the box over its tailnet. |
 
-## First run
+Install Docker on Ubuntu:
+
+```bash
+curl -fsSL https://get.docker.com | sudo sh
+sudo usermod -aG docker "$USER" && newgrp docker
+```
+
+## 2. Get the stack
 
 ```bash
 git clone https://github.com/kisaesdevlab/vibe-recap.git
 cd vibe-recap
 cp .env.example .env
-# edit .env: set POSTGRES_PASSWORD, pick TLS_MODE, set DOMAIN if not lan
-docker compose up --build -d
-docker compose logs -f api worker ollama-init
 ```
 
-The first start pulls the language model (several GB). The `ollama-init` container exits when the
-pull finishes. The API is usable before that; script generation waits for the model.
+Edit `.env`:
 
-## TLS modes
+| Variable | Set it to |
+|---|---|
+| `POSTGRES_PASSWORD` | A long random string. Required. |
+| `TLS_MODE` | `lan` (default), `tailscale`, or `domain`. See section 4. |
+| `DOMAIN` | The hostname clients will use, for `tailscale` and `domain` modes. |
+| `RECAP_DATA` | Where encrypted files live on the host. Default `./data`. Put it on the disk you back up. |
+| `MASTER_KEY_PASSPHRASE` | Optional. If set, the master key on disk is wrapped with it and the passphrase must be present at every start. |
 
-| TLS_MODE | When | Extra steps |
-|---|---|---|
-| `lan` (default) | Inside the office network only | Browser warns once. Trust `data/caddy/pki/authorities/local/root.crt` on each workstation to stop the warning. |
-| `tailscale` | Access over the tailnet | Set `DOMAIN` to the machine's tailnet name. Copy `compose.override.example.yml` to `compose.override.yml` and uncomment the tailscale socket mount. Enable HTTPS certificates in the Tailscale admin console. |
-| `domain` | Public DNS name | Set `DOMAIN`. Ports 80/443 must be reachable from the internet for ACME. |
+Everything else has a working default.
 
-## First admin
+## 3. First start
 
-Open `https://<host>/` in a browser. While no users exist the app shows a one-time setup page that
-creates the first administrator. Alternatively from the CLI:
+```bash
+docker compose up -d
+docker compose logs -f ollama-init   # exits when the language model is downloaded (about 5 GB)
+```
+
+Pre-built images are pulled from GHCR. To build from source instead: `docker compose up -d --build`.
+
+What starts:
+
+| Service | Role |
+|---|---|
+| `caddy` | TLS and reverse proxy on 80/443 |
+| `web` | the React UI |
+| `api` | Fastify API, auth, settings, retention, audit, licensing |
+| `worker` | extraction, script, verification, narration, video. No internet route. |
+| `ollama` | the language model (and OCR model) |
+| `ollama-init` | one-shot model download, exits when done |
+| `postgres`, `redis` | database and queue |
+
+Check health:
+
+```bash
+curl -k https://<host>/healthz   # {"ok":true,...}
+curl -k https://<host>/readyz    # "ok" once Ollama answers; "degraded" while the model downloads
+```
+
+## 4. TLS modes
+
+**lan** (default). Caddy's internal CA issues a certificate on the fly for whatever name or IP the
+browser used. Browsers warn once. To stop the warning on office PCs, import
+`data/caddy/pki/authorities/local/root.crt` as a trusted root.
+
+**tailscale**. Set `TLS_MODE=tailscale` and `DOMAIN=<machine>.<tailnet>.ts.net`. Enable *HTTPS
+certificates* in the Tailscale admin console. Copy `compose.override.example.yml` to
+`compose.override.yml` and uncomment the `caddy` block that mounts the tailscaled socket. Restart
+with `docker compose up -d`.
+
+**domain**. Set `TLS_MODE=domain` and `DOMAIN=recap.yourfirm.com`. Point the DNS name at the host and
+make sure ports 80 and 443 are reachable from the internet for the certificate challenge.
+
+## 5. First admin
+
+Open `https://<host>/`. While no users exist the app shows a one-time setup page that creates the
+first administrator and disables itself. From the command line instead:
 
 ```bash
 docker compose run --rm api seed-admin admin@yourfirm.com "Your Name" 'a-long-passphrase'
 ```
 
-Passwords must be at least 12 characters and not appear in the bundled list of 100,000 commonly
-breached passwords.
+Passwords need 12 characters or more and cannot be one of the 100,000 most common passwords.
 
-## Health
+## 6. Settings to review before the first return
+
+Settings > General: firm name, logo, colors, sign-off sentence, narration voice.
+Settings > Retention: how long source PDFs, scripts, and videos stay. Defaults 30 / 365 / 90 days.
+Settings > License: paste the key from your Kisaes order. Without it the app is read-only.
+Settings > Users: add preparers and staff; invite links are valid for 24 hours.
+
+## 7. Using an Ollama already running on the host
+
+Keep the worker offline and route it through a tiny proxy that only reaches the host's Ollama:
+
+1. In `compose.override.yml` uncomment the `ollama-proxy` block and the two `replicas: 0` blocks.
+2. In `.env` set `OLLAMA_URL=http://ollama-proxy:11434`.
+3. `docker compose up -d`.
+
+The host's Ollama must listen on all interfaces (`OLLAMA_HOST=0.0.0.0`) and have `qwen3:8b` and
+`glm-ocr` pulled.
+
+## 8. Updating
 
 ```bash
-curl -k https://<host>/healthz   # 200 when the API is up
-curl -k https://<host>/readyz    # ok | degraded (Ollama down) | failed (Postgres or Redis down)
+git pull
+docker compose pull
+docker compose up -d
 ```
 
-## Using an Ollama that already runs on the host
+Database migrations run automatically when the API starts. Form profiles under
+`data/form-profiles` are yours and are never overwritten by an update.
 
-Keep the worker offline and route it through a small proxy. See `compose.override.example.yml`,
-section `ollama-proxy`, then set `OLLAMA_URL=http://ollama-proxy:11434` in `.env`.
+## 9. Backups
 
-## Updating
+Back up two things together: the `RECAP_DATA` directory (encrypted blobs and `keys/master.key`)
+and the Postgres database. See Settings > Backup for the Duplicati sidecar and the `pg_dump` line.
+Keep a separate offline copy of `data/keys/master.key`. Without it the blobs cannot be read.
 
-```bash
-docker compose pull && docker compose up -d
-```
+## 10. Troubleshooting
 
-Database migrations run automatically when the API starts.
+| Symptom | Check |
+|---|---|
+| Browser shows a certificate error in `lan` mode | Expected once. Import the root certificate (section 4) or click through. |
+| `readyz` says `degraded` | Ollama is still downloading the model, or `OLLAMA_URL` points somewhere unreachable. `docker compose logs ollama-init`. |
+| Job fails at `script` with "model ... is not available" | The model is not pulled yet, or the model name in Settings > General does not match. Use *Test Ollama*. |
+| Job fails at `extract` with "required lines missing" | The package is not a 1040, or the software layout needs a profile tweak. Copy `data/form-profiles/1040-2025-<software>.yaml`, adjust, re-extract. |
+| Job fails at `recon` | The extracted lines do not foot. Open the job, read the check that failed. A preparer can downgrade one check with a reason; the job then proceeds and the exception stays visible. |
+| Job fails at `verify` | The script states something the return does not support. Edit the script or regenerate. |
+| Job fails at `ocr` with "scanned pages exceeded time limit" | Scanned packages over about 12 pages need more than the 90 s per-page cap on this CPU. Ask for a text-layer PDF. |
+| Worker logs `PermissionError` on `/data/keys` | `RECAP_DATA` is owned by another user. Both containers run as uid 1000; `sudo chown -R 1000:1000 data`. |
+| "worker restarted mid-job" on a job | The worker was restarted while processing. Click *Retry*; it resumes at that step. |
+| Upload says "PDF is password-protected" | Remove the password in the tax software's print dialog and upload again. |
+| Everything is read-only | Settings > License: the key is missing, rejected, or the licensing server has been unreachable for more than 14 days. |
+| Changing *Concurrency* had no effect | `docker compose restart worker`. |
+
+Logs: `docker compose logs -f api worker`. Logs contain job ids and hashes, never names or amounts.

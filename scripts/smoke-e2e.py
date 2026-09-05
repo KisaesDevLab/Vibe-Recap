@@ -96,7 +96,7 @@ def main() -> int:
     if code != 201:
         return 1
     job_id = q["jobIds"][0]
-    for _ in range(90):
+    for _ in range(900):
         code, job = api.call("GET", f"/api/jobs/{job_id}")
         if job["status"] not in ("queued", "processing"):
             break

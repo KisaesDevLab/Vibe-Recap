@@ -1,6 +1,7 @@
 import cron, { type ScheduledTask } from "node-cron";
 import type { FastifyInstance } from "fastify";
 import { runPurge } from "./purge.js";
+import { checkLicense } from "./license.js";
 
 /** Scheduled jobs inside the API. Every job logs start/finish with counts only. */
 export function startCron(app: FastifyInstance): ScheduledTask[] {
@@ -25,6 +26,18 @@ export function startCron(app: FastifyInstance): ScheduledTask[] {
         app.log.info({ purgedFiles: r.purgedFiles, purgedJobs: r.purgedJobs, skippedLegalHold: r.skippedLegalHold }, "retention purge");
       } catch (err) {
         app.log.error({ err }, "retention purge failed");
+      }
+    }),
+  );
+
+  // Daily license check with a 14-day offline grace period.
+  tasks.push(
+    cron.schedule("23 3 * * *", async () => {
+      try {
+        const st = await checkLicense(app, app.licenseClient);
+        app.log.info({ status: st.status }, "license check");
+      } catch (err) {
+        app.log.error({ err }, "license check failed");
       }
     }),
   );
