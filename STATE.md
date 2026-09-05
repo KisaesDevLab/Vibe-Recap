@@ -10,7 +10,7 @@ Updated by Claude Code at the end of each phase. Read after CLAUDE.md, docs/PLAN
 | 2 Upload, storage, encryption, clients, jobs | done 2026-09-05 | age storage on both sides, staging via worker queue, batches/jobs/clients UI; tests green; stack smoke-tested locally |
 | 3 Extraction, profiles, recon | done 2026-09-05 | 6/6 layouts match `.expected.json` exactly; recon gate, exceptions, re-extract, extraction panel; pipeline orchestrator with resume points |
 | 4 OCR fallback | done 2026-09-05 | rasterize + Ollama OCR + invisible text-layer overlay; 90 s per-page cap; tested with a stand-in OCR engine, not yet against real GLM-OCR |
-| 5 Script, validator, verifier | not started | |
+| 5 Script, validator, verifier | done 2026-09-05 | prompt + Ollama client + 3-attempt loop, Python validator with TS mirror, independent verifier (own PDF pass) with page/label evidence; golden scripts pass on all 6 layouts; script editor + verification panel |
 | 6 Render, review, approval | not started | |
 | 7 Release and download | not started | |
 | 8 Retention and purge | not started | |
@@ -29,6 +29,11 @@ Updated by Claude Code at the end of each phase. Read after CLAUDE.md, docs/PLAN
   lazily by the step functions). `replace_file()` is how a step stores an artifact. Form profiles
   extend `form-profiles/_base-1040.yaml`; regexes must be single-quoted in YAML. The generic profile
   is used for unknown software. `ctx.extraction` is the dict the script prompt and validator read.
+- Phase 5: `worker/recap/validate.py` and `packages/shared/src/script.ts` must stay in step (same
+  regexes, same 0.1-point percent tolerance). Golden scripts live in `tests/fixtures/scripts/` and
+  double as the stub model's output in pipeline tests (`_client_for` is monkeypatched). The verifier
+  reads only `recap.numbers`; `test_verify.py` greps its imports. Verification items carry
+  `page` + `label`; the UI links to `/api/jobs/:id/source.pdf#page=N`.
 
 - Phase 1: `npm run test:services` starts a throwaway Postgres (55432) and Redis (56379) that the
   API integration tests use; they skip with a warning when those are unreachable. The worker venv

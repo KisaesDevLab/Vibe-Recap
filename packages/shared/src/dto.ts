@@ -232,3 +232,38 @@ export interface ExtractionResponse {
   sha256: string | null;
   reconExceptions: ReconExceptionDto[];
 }
+
+// ---------------------------------------------------------------------------
+// Phase 5: script and verification
+// ---------------------------------------------------------------------------
+
+export interface ScriptResponse {
+  script: string | null;
+  sha256: string | null;
+  extractionSha256: string | null;
+  generatedFromExtraction: boolean;
+}
+
+export interface VerificationItemDto {
+  kind: string;
+  text: string;
+  status: "verified" | "flagged";
+  slide?: string;
+  page?: number;
+  label?: string;
+  reason?: string;
+}
+
+export interface VerificationDto {
+  passed: boolean;
+  items: VerificationItemDto[];
+  source_sha256: string;
+  script_sha256: string;
+}
+
+export interface VerificationResponse {
+  verification: VerificationDto | null;
+  sha256: string | null;
+  /** True when the stored verification was produced for a different script than the current one. */
+  stale: boolean;
+}

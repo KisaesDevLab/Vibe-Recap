@@ -7,12 +7,16 @@ import { useAuth } from "../lib/auth";
 import { fmtBytes, fmtDate } from "../lib/format";
 import { StatusBadge } from "../components/JobTable";
 import { ExtractionPanel } from "../components/ExtractionPanel";
+import { ScriptEditor } from "../components/ScriptEditor";
+import { VerificationPanel } from "../components/VerificationPanel";
+import type { ExtractionResponse } from "@vibe-recap/shared";
 import { Alert, Button, Card, PageTitle, Spinner } from "../ui";
 
 export function JobPage() {
   const { id } = useParams();
   const { can } = useAuth();
   const { data: job, error, loading, reload } = useApi<JobDetailDto>(id ? `/api/jobs/${id}` : null, 4000);
+  const { data: extractionRes } = useApi<ExtractionResponse>(id ? `/api/jobs/${id}/extraction` : null, 10000);
   const [msg, setMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -78,6 +82,8 @@ export function JobPage() {
               {job.events.length === 0 && <li className="text-slate-500">Queued; waiting for the worker.</li>}
             </ol>
           </Card>
+          <ScriptEditor job={job} extraction={extractionRes?.extraction ?? null} onChanged={() => void reload()} />
+          <VerificationPanel job={job} />
           <ExtractionPanel job={job} onChanged={() => void reload()} />
         </div>
         <div className="space-y-4">

@@ -12,7 +12,7 @@ import re
 _AMOUNT_RE = re.compile(
     r"""^\(?\s*-?\$?\s*(?P<num>\d{1,3}(?:,\d{3})+|\d+)(?:\.(?P<cents>\d{1,2}))?\s*\)?-?$"""
 )
-_TOKEN_RE = re.compile(r"\(?-?\$?\d[\d,]*(?:\.\d{1,2})?\)?-?")
+_TOKEN_RE = re.compile(r"\(?-?\$?\d(?:[\d,]*\d)?(?:\.\d{1,2})?\)?-?")
 
 
 def parse_amount(token: str) -> int | None:
