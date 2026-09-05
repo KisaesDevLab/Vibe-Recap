@@ -2,6 +2,8 @@
 # TLS_MODE selects one of caddy/tls/{lan,tailscale,domain}.caddy. Default: lan.
 {
 	admin off
+	# Connections without SNI (browsers hitting the LAN IP) get the DOMAIN certificate.
+	default_sni {$DOMAIN:localhost}
 }
 
 (recap_routes) {
