@@ -1,0 +1,4 @@
+# Fallback profile when the software is not recognised. Same lines, looser geometry.
+extends: _base-1040.yaml
+software: unknown
+geometry: { y_tolerance: 5, value_min_x: 330, number_position: auto }

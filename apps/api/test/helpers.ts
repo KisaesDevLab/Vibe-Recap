@@ -5,6 +5,25 @@ import { createDb, type Db } from "../src/db/index.js";
 import { runMigrations } from "../src/db/migrate.js";
 import { createRedis } from "../src/services/redis.js";
 import { buildApp } from "../src/app.js";
+import { Storage } from "../src/services/storage.js";
+import type { StageResult, Stager } from "../src/services/queue.js";
+import { promises as fs } from "node:fs";
+import os from "node:os";
+import path from "node:path";
+
+/** Stands in for the Python worker: answers from a table keyed by sha256, or a default. */
+export class FakeStager implements Stager {
+  bySha = new Map<string, StageResult>();
+  fallback: StageResult = { ok: true, firstName: "Test", lastName: "Person", taxYear: 2025, software: "ultratax", form: "1040", pageCount: 2 };
+  constructor(private storage: Storage) {}
+  async stage(stageId: string, fileId: string): Promise<StageResult> {
+    const rel = `blobs/staging/${stageId}/${fileId}.age`;
+    const data = await this.storage.get(rel, rel.slice(0, -4) + ".key");
+    const { createHash } = await import("node:crypto");
+    const sha = createHash("sha256").update(data).digest("hex");
+    return this.bySha.get(sha) ?? this.fallback;
+  }
+}
 
 export const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL ?? "postgres://recap:recap@localhost:55432/recap_test";
 export const TEST_REDIS_URL = process.env.TEST_REDIS_URL ?? "redis://localhost:56379";
@@ -13,6 +32,9 @@ export interface TestContext {
   app: FastifyInstance;
   db: Db;
   config: Config;
+  storage: Storage;
+  stager: FakeStager;
+  dataDir: string;
   close: () => Promise<void>;
 }
 
@@ -39,30 +61,38 @@ export async function resetDatabase(db: Db): Promise<void> {
 }
 
 export async function createTestContext(overrides: Partial<Config> = {}): Promise<TestContext> {
+  const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "recap-data-"));
   const config: Config = {
     ...loadConfig({}),
     DATABASE_URL: TEST_DATABASE_URL,
     REDIS_URL: TEST_REDIS_URL,
     COOKIE_SECURE: false,
     TRUST_PROXY: true,
-    LOG_LEVEL: "silent",
-    DATA_DIR: process.env.TEST_DATA_DIR ?? "./.test-data",
+    LOG_LEVEL: process.env.TEST_LOG_LEVEL ?? "silent",
+    DATA_DIR: dataDir,
     ...overrides,
   };
   const { db, close } = createDb(config.DATABASE_URL, { max: 4 });
   await resetDatabase(db);
   const redis = createRedis(config.REDIS_URL);
   await redis.flushdb();
-  const app = await buildApp({ config, db, redis });
+  const storage = new Storage(dataDir);
+  await storage.init();
+  const stager = new FakeStager(storage);
+  const app = await buildApp({ config, db, redis, storage, stager });
   await app.ready();
   return {
     app,
     db,
     config,
+    storage,
+    stager,
+    dataDir,
     close: async () => {
       await app.close();
       await redis.quit();
       await close();
+      await fs.rm(dataDir, { recursive: true, force: true });
     },
   };
 }

@@ -15,7 +15,7 @@ RUN npm run build -w packages/shared && npm run build -w apps/api \
 FROM node:24-bookworm-slim
 ENV NODE_ENV=production
 WORKDIR /app
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates tini && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates tini gosu && rm -rf /var/lib/apt/lists/*
 COPY --from=build /src/node_modules ./node_modules
 COPY --from=build /src/package.json ./package.json
 COPY --from=build /src/packages/shared/package.json ./packages/shared/package.json
@@ -26,7 +26,8 @@ COPY --from=build /src/apps/api/drizzle ./apps/api/drizzle
 COPY --from=build /src/apps/api/data ./apps/api/data
 COPY apps/api/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh && mkdir -p /data && chown node:node /data
-USER node
+# Starts as root only to fix /data ownership on a fresh bind mount, then drops to uid 1000 (node).
+# The worker container runs as the same uid so both can read the master key and blobs.
 EXPOSE 3000
 ENTRYPOINT ["tini", "--", "docker-entrypoint.sh"]
 CMD ["serve"]

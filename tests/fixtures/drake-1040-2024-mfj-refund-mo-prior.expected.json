@@ -1,0 +1,126 @@
+{
+  "meta": {
+    "software": "drake",
+    "tax_year": 2024,
+    "form": "1040",
+    "filing_status": "MFJ",
+    "state_returns": [
+      "MO"
+    ]
+  },
+  "taxpayer": {
+    "first_name": "Alex",
+    "last_name": "Fixture",
+    "spouse_first_name": "Jordan"
+  },
+  "income": {
+    "wages": 135000,
+    "interest": 1240,
+    "dividends": 3860,
+    "ira_pensions": 0,
+    "social_security_taxable": 0,
+    "capital_gain": 4200,
+    "schedule_1_total": 2000,
+    "total_income": 146300
+  },
+  "adjustments": {
+    "schedule_1_adjustments": 6500,
+    "agi": 139800
+  },
+  "deductions": {
+    "type": "standard",
+    "amount": 30000,
+    "qbi": 0,
+    "taxable_income": 109800
+  },
+  "tax": {
+    "tax": 15937,
+    "schedule_2_total": 0,
+    "nonrefundable_credits": 2000,
+    "other_taxes": 283,
+    "total_tax": 14220,
+    "effective_rate": 0.1295
+  },
+  "payments": {
+    "withholding": 16370,
+    "estimates": 0,
+    "refundable_credits": 0,
+    "total_payments": 16370
+  },
+  "result": {
+    "refund": 2150,
+    "amount_owed": 0,
+    "applied_to_next_year": 0
+  },
+  "state": [
+    {
+      "code": "MO",
+      "taxable_income": 118000,
+      "tax": 5310,
+      "payments": 5900,
+      "refund": 590,
+      "amount_owed": 0
+    }
+  ],
+  "prior_year": {
+    "present": false,
+    "agi": 0,
+    "total_tax": 0,
+    "refund": 0,
+    "amount_owed": 0
+  },
+  "observations": [
+    {
+      "id": "withholding_ratio",
+      "delta": 2150,
+      "pct": 1.1512
+    }
+  ],
+  "recon": {
+    "passed": true,
+    "checks": [
+      {
+        "name": "total_income_foots",
+        "expected": 146300,
+        "actual": 146300,
+        "ok": true
+      },
+      {
+        "name": "agi_foots",
+        "expected": 139800,
+        "actual": 139800,
+        "ok": true
+      },
+      {
+        "name": "taxable_income_foots",
+        "expected": 109800,
+        "actual": 109800,
+        "ok": true
+      },
+      {
+        "name": "total_tax_foots",
+        "expected": 14220,
+        "actual": 14220,
+        "ok": true
+      },
+      {
+        "name": "total_payments_foots",
+        "expected": 16370,
+        "actual": 16370,
+        "ok": true
+      },
+      {
+        "name": "result_foots",
+        "expected": 2150,
+        "actual": 2150,
+        "ok": true
+      },
+      {
+        "name": "state_MO_result_foots",
+        "expected": 590,
+        "actual": 590,
+        "ok": true
+      }
+    ]
+  }
+}

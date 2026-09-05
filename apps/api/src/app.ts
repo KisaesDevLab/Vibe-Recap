@@ -13,6 +13,15 @@ import { commonPasswordListSize } from "./auth/password.js";
 import { healthRoutes } from "./routes/health.js";
 import { setupRoutes } from "./routes/setup.js";
 import { authRoutes } from "./routes/auth.js";
+import multipart from "@fastify/multipart";
+import { clientRoutes } from "./routes/clients.js";
+import { jobRoutes } from "./routes/jobs.js";
+import { uploadRoutes } from "./routes/uploads.js";
+import { extractionRoutes } from "./routes/extraction.js";
+import type { Storage } from "./services/storage.js";
+import { Queues, type Stager } from "./services/queue.js";
+import { StagingService } from "./services/staging.js";
+import { startCron } from "./services/cron.js";
 
 declare module "fastify" {
   interface FastifyInstance {
@@ -20,6 +29,9 @@ declare module "fastify" {
     db: Db;
     redis: Redis;
     sessionPolicy: SessionPolicy;
+    storage: Storage;
+    queues: Queues;
+    staging: StagingService;
   }
 }
 
@@ -27,6 +39,11 @@ export interface AppDeps {
   config: Config;
   db: Db;
   redis: Redis;
+  storage: Storage;
+  /** Override the staging identifier (tests use a fake instead of the worker). */
+  stager?: Stager;
+  /** Start node-cron jobs (off in tests). */
+  cron?: boolean;
 }
 
 export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
@@ -48,7 +65,16 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     app.log.error("common password list missing or empty; breach check is disabled");
   }
 
+  app.decorate("storage", deps.storage);
+  const queues = new Queues(deps.redis);
+  app.decorate("queues", queues);
+  app.decorate(
+    "staging",
+    new StagingService(deps.redis, deps.db, deps.storage, deps.stager ?? queues, (jobId) => queues.enqueueRecap(jobId)),
+  );
+
   await app.register(cookie);
+  await app.register(multipart, { limits: { fileSize: 2 * 1024 * 1024 * 1024, files: 200, fields: 10 } });
   await app.register(rateLimit, { global: false, redis: deps.redis, nameSpace: "recap-rl:" });
   await app.register(authPluginRegistered, { policy: app.sessionPolicy });
 
@@ -78,6 +104,16 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   await app.register(healthRoutes);
   await app.register(setupRoutes);
   await app.register(authRoutes);
+  await app.register(clientRoutes);
+  await app.register(jobRoutes);
+  await app.register(uploadRoutes);
+  await app.register(extractionRoutes);
+
+  const tasks = deps.cron ? startCron(app) : [];
+  app.addHook("onClose", async () => {
+    for (const t of tasks) await t.stop();
+    await queues.close();
+  });
 
   return app;
 }

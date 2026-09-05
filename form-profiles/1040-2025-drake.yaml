@@ -1,0 +1,5 @@
+# Form 1040 profile for drake. Overrides _base-1040.yaml.
+extends: _base-1040.yaml
+software: drake
+geometry: { y_tolerance: 3, value_min_x: 340 }
+notes: "Compact layout with a tighter line pitch and a value column further left."

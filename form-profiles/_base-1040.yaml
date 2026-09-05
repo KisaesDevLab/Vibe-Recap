@@ -1,0 +1,83 @@
+# Base Form 1040 profile. Software profiles `extends` this and override geometry or
+# individual lines. Profiles are data: adding a package must not need Python changes.
+# Regexes are single-quoted so backslashes reach the regex engine untouched.
+form: "1040"
+tax_years: [2023, 2024, 2025]
+
+geometry:
+  y_tolerance: 3          # points; words within this distance of a line's top belong to that line
+  value_min_x: 360        # amounts sit to the right of this x (letter page is 612 wide)
+  number_position: auto   # prefix | suffix | auto: where the IRS line number sits relative to its label
+
+# Page classifiers (regex, case-insensitive). A page gets the first kind whose `any` matches
+# and none of whose `not` patterns match. `all` patterns must all match too.
+pages:
+  comparison: { any: ['Two.Year Comparison', 'Tax Return Comparison', 'Comparison of .* Tax Returns'] }
+  form_2210: { any: ['Form 2210 \(', 'Underpayment of Estimated Tax'] }
+  schedule_1: { any: ['Schedule 1 \(Form 1040'] }
+  schedule_a: { any: ['Schedule A \(Form 1040'] }
+  f1040_1: { any: ['Form 1040 \(', 'Form 1040\b', '1040-SR'], all: ['Filing Status'], not: ['Schedule [1-3A] \(Form 1040'] }
+  f1040_2: { any: ['Form 1040 \(', 'Form 1040\b', '1040-SR'], all: ['total tax|Amount You Owe|Refund'], not: ['Filing Status', 'Schedule [1-3A] \(Form 1040'] }
+  state: { any: ['Individual Income Tax Return', 'Resident Income Tax', 'Income Tax Return'], not: ['U\.S\. Individual', 'Form 1040 \(', 'Comparison'] }
+
+filing_status:
+  S: 'Single'
+  MFJ: 'Married filing jointly'
+  MFS: 'Married filing separately'
+  HOH: 'Head of household'
+  QSS: 'Qualifying surviving spouse|Qualifying widow'
+
+required:
+  - income.total_income
+  - adjustments.agi
+  - deductions.amount
+  - deductions.taxable_income
+  - tax.tax
+  - tax.total_tax
+  - payments.total_payments
+
+lines:
+  - { path: income.wages, page: f1040_1, line: '1z', label: 'Add lines 1a through 1h|total wages' }
+  - { path: income.interest, page: f1040_1, line: '2b', label: 'Taxable interest' }
+  - { path: income.dividends, page: f1040_1, line: '3b', label: 'Ordinary dividends' }
+  - { path: income.ira_pensions, page: f1040_1, line: '4b', label: 'Taxable amount', combine: sum }
+  - { path: income.ira_pensions, page: f1040_1, line: '5b', label: 'Taxable amount', combine: sum }
+  - { path: income.social_security_taxable, page: f1040_1, line: '6b', label: 'Taxable amount' }
+  - { path: income.capital_gain, page: f1040_1, line: '7', label: 'Capital gain' }
+  - { path: income.schedule_1_total, page: f1040_1, line: '8', label: 'Additional income' }
+  - { path: income.total_income, page: f1040_1, line: '9', label: 'total income' }
+  - { path: adjustments.schedule_1_adjustments, page: f1040_1, line: '10', label: 'Adjustments to income' }
+  - { path: adjustments.agi, page: f1040_1, line: '11', label: 'adjusted gross income' }
+  - { path: deductions.amount, page: f1040_2, line: '12', label: 'Standard deduction or itemized' }
+  - { path: deductions.qbi, page: f1040_2, line: '13', label: 'Qualified business income' }
+  - { path: deductions.taxable_income, page: f1040_2, line: '15', label: 'taxable income' }
+  - { path: tax.tax, page: f1040_2, line: '16', label: '^Tax\b' }
+  - { path: tax.schedule_2_total, page: f1040_2, line: '17', label: 'Schedule 2, line 3' }
+  - { path: tax.nonrefundable_credits, page: f1040_2, line: '21', label: 'Add lines 19 and 20' }
+  - { path: tax.other_taxes, page: f1040_2, line: '23', label: 'Other taxes' }
+  - { path: tax.total_tax, page: f1040_2, line: '24', label: 'total tax' }
+  - { path: payments.withholding, page: f1040_2, line: '25d', label: 'withheld' }
+  - { path: payments.estimates, page: f1040_2, line: '26', label: 'estimated tax payments' }
+  - { path: payments.refundable_credits, page: f1040_2, line: '32', label: 'refundable credits' }
+  - { path: payments.total_payments, page: f1040_2, line: '33', label: 'total payments' }
+  - { path: result.refund, page: f1040_2, line: '35a', label: 'refunded to you' }
+  - { path: result.applied_to_next_year, page: f1040_2, line: '36', label: 'applied to your .* estimated tax' }
+  - { path: result.amount_owed, page: f1040_2, line: '37', label: 'amount you owe' }
+  - { path: extras.estimated_tax_penalty, page: f1040_2, line: '38', label: 'Estimated tax penalty', required: false }
+  - { path: extras.itemized_total, page: schedule_a, line: '17', label: 'Total itemized deductions', required: false }
+
+state:
+  lines:
+    - { path: taxable_income, label: 'taxable income' }
+    - { path: tax, label: 'income tax\b|\btax liability|^tax$|total tax' }
+    - { path: payments, label: 'total payments' }
+    - { path: refund, label: 'refund|overpayment|overpaid' }
+    - { path: amount_owed, label: 'amount due|amount you owe|balance due|tax due' }
+
+comparison:
+  rows:
+    - { path: agi, label: 'adjusted gross income' }
+    - { path: taxable_income, label: 'taxable income' }
+    - { path: total_tax, label: 'total tax' }
+    - { path: refund, label: 'refund' }
+    - { path: amount_owed, label: 'amount owed|balance due|amount due|amount you owe' }

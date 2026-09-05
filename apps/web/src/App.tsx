@@ -1,11 +1,16 @@
 import { Navigate, Route, Routes, useLocation } from "react-router";
 import type { ReactNode } from "react";
+import type { Role } from "@vibe-recap/shared";
 import { useAuth } from "./lib/auth";
 import { Layout } from "./components/Layout";
 import { LoginPage } from "./pages/Login";
 import { SetupPage } from "./pages/Setup";
 import { DashboardPage } from "./pages/Dashboard";
-import { Spinner } from "./ui";
+import { UploadPage } from "./pages/Upload";
+import { BatchPage } from "./pages/Batch";
+import { ClientDetailPage, ClientsPage } from "./pages/Clients";
+import { JobPage } from "./pages/Job";
+import { Alert, Spinner } from "./ui";
 
 function RequireAuth({ children }: { children: ReactNode }) {
   const { user, loading, setupNeeded } = useAuth();
@@ -22,6 +27,12 @@ function RequireAuth({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
+function RequireRole({ min, children }: { min: Role; children: ReactNode }) {
+  const { can } = useAuth();
+  if (!can(min)) return <Alert kind="error">Your role does not have access to this page.</Alert>;
+  return <>{children}</>;
+}
+
 export function App() {
   return (
     <Routes>
@@ -35,6 +46,32 @@ export function App() {
         }
       >
         <Route index element={<DashboardPage />} />
+        <Route
+          path="/upload"
+          element={
+            <RequireRole min="staff">
+              <UploadPage />
+            </RequireRole>
+          }
+        />
+        <Route path="/batches/:id" element={<BatchPage />} />
+        <Route path="/jobs/:id" element={<JobPage />} />
+        <Route
+          path="/clients"
+          element={
+            <RequireRole min="staff">
+              <ClientsPage />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="/clients/:id"
+          element={
+            <RequireRole min="staff">
+              <ClientDetailPage />
+            </RequireRole>
+          }
+        />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

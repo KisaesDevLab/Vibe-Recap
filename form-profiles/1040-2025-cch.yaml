@@ -1,0 +1,5 @@
+# Form 1040 profile for cch. Overrides _base-1040.yaml.
+extends: _base-1040.yaml
+software: cch
+geometry: { y_tolerance: 3, value_min_x: 380 }
+notes: "Dotted leaders between label and value are ignored because they never parse as amounts."

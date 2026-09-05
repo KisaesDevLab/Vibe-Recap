@@ -1,0 +1,141 @@
+{
+  "meta": {
+    "software": "gosystem",
+    "tax_year": 2025,
+    "form": "1040",
+    "filing_status": "HOH",
+    "state_returns": [
+      "KS",
+      "MO"
+    ]
+  },
+  "taxpayer": {
+    "first_name": "Morgan",
+    "last_name": "Placeholder",
+    "spouse_first_name": null
+  },
+  "income": {
+    "wages": 71300,
+    "interest": 95,
+    "dividends": 410,
+    "ira_pensions": 0,
+    "social_security_taxable": 0,
+    "capital_gain": 0,
+    "schedule_1_total": 0,
+    "total_income": 71805
+  },
+  "adjustments": {
+    "schedule_1_adjustments": 0,
+    "agi": 71805
+  },
+  "deductions": {
+    "type": "standard",
+    "amount": 22500,
+    "qbi": 0,
+    "taxable_income": 49305
+  },
+  "tax": {
+    "tax": 5100,
+    "schedule_2_total": 0,
+    "nonrefundable_credits": 2000,
+    "other_taxes": 0,
+    "total_tax": 3100,
+    "effective_rate": 0.0629
+  },
+  "payments": {
+    "withholding": 6400,
+    "estimates": 0,
+    "refundable_credits": 1600,
+    "total_payments": 8000
+  },
+  "result": {
+    "refund": 4900,
+    "amount_owed": 0,
+    "applied_to_next_year": 0
+  },
+  "state": [
+    {
+      "code": "KS",
+      "taxable_income": 48000,
+      "tax": 2150,
+      "payments": 2400,
+      "refund": 250,
+      "amount_owed": 0
+    },
+    {
+      "code": "MO",
+      "taxable_income": 12000,
+      "tax": 420,
+      "payments": 300,
+      "refund": 0,
+      "amount_owed": 120
+    }
+  ],
+  "prior_year": {
+    "present": false,
+    "agi": 0,
+    "total_tax": 0,
+    "refund": 0,
+    "amount_owed": 0
+  },
+  "observations": [
+    {
+      "id": "withholding_ratio",
+      "delta": 3300,
+      "pct": 2.0645
+    }
+  ],
+  "recon": {
+    "passed": true,
+    "checks": [
+      {
+        "name": "total_income_foots",
+        "expected": 71805,
+        "actual": 71805,
+        "ok": true
+      },
+      {
+        "name": "agi_foots",
+        "expected": 71805,
+        "actual": 71805,
+        "ok": true
+      },
+      {
+        "name": "taxable_income_foots",
+        "expected": 49305,
+        "actual": 49305,
+        "ok": true
+      },
+      {
+        "name": "total_tax_foots",
+        "expected": 3100,
+        "actual": 3100,
+        "ok": true
+      },
+      {
+        "name": "total_payments_foots",
+        "expected": 8000,
+        "actual": 8000,
+        "ok": true
+      },
+      {
+        "name": "result_foots",
+        "expected": 4900,
+        "actual": 4900,
+        "ok": true
+      },
+      {
+        "name": "state_KS_result_foots",
+        "expected": 250,
+        "actual": 250,
+        "ok": true
+      },
+      {
+        "name": "state_MO_result_foots",
+        "expected": -120,
+        "actual": -120,
+        "ok": true
+      }
+    ]
+  }
+}

@@ -1,0 +1,5 @@
+# Form 1040 profile for gosystem. Overrides _base-1040.yaml.
+extends: _base-1040.yaml
+software: gosystem
+geometry: { y_tolerance: 3, value_min_x: 380 }
+notes: "Upper-case labels; every label regex is matched case-insensitively."

@@ -4,6 +4,7 @@ import { runMigrations } from "./db/migrate.js";
 import { createRedis } from "./services/redis.js";
 import { buildApp } from "./app.js";
 import { createLogger } from "./logger.js";
+import { Storage } from "./services/storage.js";
 
 async function main() {
   const config = loadConfig();
@@ -12,7 +13,9 @@ async function main() {
   log.info("running migrations");
   await runMigrations(db);
   const redis = createRedis(config.REDIS_URL);
-  const app = await buildApp({ config, db, redis });
+  const storage = new Storage(config.DATA_DIR, config.MASTER_KEY_PASSPHRASE);
+  await storage.init();
+  const app = await buildApp({ config, db, redis, storage, cron: true });
 
   const shutdown = async (signal: string) => {
     app.log.info({ signal }, "shutting down");

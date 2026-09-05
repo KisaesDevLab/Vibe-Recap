@@ -1,0 +1,5 @@
+# Form 1040 profile for proseries. Overrides _base-1040.yaml.
+extends: _base-1040.yaml
+software: proseries
+geometry: { y_tolerance: 3, value_min_x: 360, number_position: suffix }
+notes: "Line numbers are printed after the label text."

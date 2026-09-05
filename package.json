@@ -9,8 +9,8 @@
     "build": "npm run build -w packages/shared && npm run build -w apps/api && npm run build -w apps/web",
     "test": "npm run test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "test:services": "docker compose -f compose.test.yml up -d --wait",
-    "test:services:down": "docker compose -f compose.test.yml down -v",
+    "test:services": "docker compose -p recap-test -f compose.test.yml up -d --wait",
+    "test:services:down": "docker compose -p recap-test -f compose.test.yml down -v",
     "dev:api": "npm run dev -w apps/api",
     "dev:web": "npm run dev -w apps/web"
   }

@@ -1,0 +1,30 @@
+# Software detection signatures. Matched case-insensitively against the text of the
+# first three pages. First match wins; order is most-specific first. Edit without code changes.
+software:
+  ultratax:
+    - "UltraTax CS"
+    - "UltraTax"
+  lacerte:
+    - "Lacerte"
+  cch:
+    - "CCH Axcess"
+    - "ProSystem fx"
+  gosystem:
+    - "GoSystem"
+  drake:
+    - "Drake Software"
+    - "Drake Tax"
+  proseries:
+    - "ProSeries"
+form:
+  "1040":
+    - "Form 1040"
+    - "U.S. Individual Income Tax Return"
+  "1040-SR":
+    - "Form 1040-SR"
+  "1120-S":
+    - "Form 1120-S"
+  "1065":
+    - "Form 1065"
+  "1041":
+    - "Form 1041"

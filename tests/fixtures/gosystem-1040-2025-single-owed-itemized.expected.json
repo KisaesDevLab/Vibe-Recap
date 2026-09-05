@@ -1,0 +1,114 @@
+{
+  "meta": {
+    "software": "gosystem",
+    "tax_year": 2025,
+    "form": "1040",
+    "filing_status": "S",
+    "state_returns": []
+  },
+  "taxpayer": {
+    "first_name": "Casey",
+    "last_name": "Sample",
+    "spouse_first_name": null
+  },
+  "income": {
+    "wages": 98000,
+    "interest": 310,
+    "dividends": 0,
+    "ira_pensions": 12000,
+    "social_security_taxable": 0,
+    "capital_gain": -3000,
+    "schedule_1_total": 0,
+    "total_income": 107310
+  },
+  "adjustments": {
+    "schedule_1_adjustments": 0,
+    "agi": 107310
+  },
+  "deductions": {
+    "type": "itemized",
+    "amount": 21400,
+    "qbi": 1800,
+    "taxable_income": 84110
+  },
+  "tax": {
+    "tax": 13240,
+    "schedule_2_total": 1100,
+    "nonrefundable_credits": 0,
+    "other_taxes": 0,
+    "total_tax": 14340,
+    "effective_rate": 0.1705
+  },
+  "payments": {
+    "withholding": 11200,
+    "estimates": 1500,
+    "refundable_credits": 0,
+    "total_payments": 12700
+  },
+  "result": {
+    "refund": 0,
+    "amount_owed": 1640,
+    "applied_to_next_year": 0
+  },
+  "state": [],
+  "prior_year": {
+    "present": false,
+    "agi": 0,
+    "total_tax": 0,
+    "refund": 0,
+    "amount_owed": 0
+  },
+  "observations": [
+    {
+      "id": "withholding_ratio",
+      "delta": -3140,
+      "pct": 0.781
+    },
+    {
+      "id": "underpayment_penalty",
+      "delta": 42,
+      "pct": 0.0
+    }
+  ],
+  "recon": {
+    "passed": true,
+    "checks": [
+      {
+        "name": "total_income_foots",
+        "expected": 107310,
+        "actual": 107310,
+        "ok": true
+      },
+      {
+        "name": "agi_foots",
+        "expected": 107310,
+        "actual": 107310,
+        "ok": true
+      },
+      {
+        "name": "taxable_income_foots",
+        "expected": 84110,
+        "actual": 84110,
+        "ok": true
+      },
+      {
+        "name": "total_tax_foots",
+        "expected": 14340,
+        "actual": 14340,
+        "ok": true
+      },
+      {
+        "name": "total_payments_foots",
+        "expected": 12700,
+        "actual": 12700,
+        "ok": true
+      },
+      {
+        "name": "result_foots",
+        "expected": -1640,
+        "actual": -1640,
+        "ok": true
+      }
+    ]
+  }
+}

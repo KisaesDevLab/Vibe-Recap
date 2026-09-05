@@ -1,0 +1,5 @@
+# Form 1040 profile for lacerte. Overrides _base-1040.yaml.
+extends: _base-1040.yaml
+software: lacerte
+geometry: { y_tolerance: 3, value_min_x: 360 }
+notes: "Some lines carry duplicated words; extract_words(use_text_flow=True) plus the dedupe pass in pdf.py handles it."

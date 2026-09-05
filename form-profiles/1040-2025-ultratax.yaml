@@ -1,0 +1,5 @@
+# Form 1040 profile for ultratax. Overrides _base-1040.yaml.
+extends: _base-1040.yaml
+software: ultratax
+geometry: { y_tolerance: 6, value_min_x: 380 }
+notes: "Labels and values are separate text runs; the value baseline can sit a few points off the label, hence the wider y tolerance."
