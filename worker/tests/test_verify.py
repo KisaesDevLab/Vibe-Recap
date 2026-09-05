@@ -176,3 +176,19 @@ def test_zero_amount_and_owed_a_refund_phrasing_and_capitalised_names():
     script0 = golden(case).replace("[[slide:next]]", "You had $0 of pension income this year. [[slide:next]]")
     v = verify(script0, str(FIXTURES / f"ultratax-1040-2025-{case}.pdf"), None, str(PROFILES))
     assert not any(k == "amount" and t == "$0" for k, t, _ in flagged(v)), flagged(v)
+
+
+def test_labeled_amount_accepts_the_line_value_later_in_the_clause():
+    """'adjusted gross income, after $6,500 in adjustments, was $147,300' names the AGI second."""
+    case = "mfj-refund-mo"
+    pdf = str(FIXTURES / f"ultratax-1040-2025-{case}.pdf")
+    script = golden(case).replace(
+        "After adjustments to income of $6,500, your adjusted gross income was $147,300.",
+        "Your adjusted gross income, after $6,500 in adjustments, was $147,300.",
+    )
+    assert "after $6,500 in adjustments" in script
+    v = verify(script, pdf, None, str(PROFILES))
+    assert not any(k == "amount" and t == "$6,500" for k, t, _ in flagged(v)), flagged(v)
+    wrong = golden(case).replace("your adjusted gross income was $147,300", "your adjusted gross income was $153,800")
+    v = verify(wrong, pdf, None, str(PROFILES))
+    assert any(k == "amount" and t == "$153,800" for k, t, _ in flagged(v)), flagged(v)

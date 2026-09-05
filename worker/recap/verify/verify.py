@@ -71,7 +71,7 @@ LINE_LABELS = {
     "overpaid": r"overpaid",
     "refund": r"refunded to you",
     "amount_owed": r"amount you owe",
-    "withholding": r"withheld",
+    "withholding": r"withheld|lines 25a through 25c",  # the real form's 25d says "Add lines 25a through 25c"
 }
 
 
@@ -401,14 +401,23 @@ def verify(script: str, source_pdf: str, prior_pdf: str | None = None, profiles_
         if YOY_WORDS.search(sent) or state_word_early.search(sent):
             continue
         for phrase, key in LABELED_PHRASES:
-            m = re.search(re.escape(phrase) + r"\b\W*(?:[\w'-]+\W+){0,6}?\$([\d,]{3,})", sent, re.I)
+            m = re.search(re.escape(phrase) + r"\b\W*(?:[\w'-]+\W+){0,6}?\$([\d,]{3,}(?<=\d))", sent, re.I)  # greedy, no trailing comma
             if not m:
                 continue
-            said = parse_amount(m.group(1))
             line_val = L.get(key)
-            if said is None or line_val is None:
+            if line_val is None:
                 continue
-            if abs(abs(said) - abs(line_val)) > 1:
+            # "the income tax on your taxable income was $13,240" names the tax, not the line.
+            if re.search(r"\b(tax|taxes|rate|percent|%)\s+(on|of)\s+(?:your\s+|the\s+|that\s+)?$", sent[: m.start()], re.I):
+                continue
+            # The first amount within six words is the claim, but the rest of the same clause counts
+            # too: "adjusted gross income, after $848 in adjustments, was $170,112" names the line's
+            # value second. The clause ends at a period or semicolon.
+            clause = re.split(r"[.;]", sent[m.end() :], maxsplit=1)[0][:60]
+            before = sent[max(0, m.start() - 40) : m.start()]  # "paid in $6,400 through withholding"
+            saids = [parse_amount(m.group(1))] + [parse_amount(a) for a in re.findall(r"\$([\d,]{3,}(?<=\d))", before + " " + clause)]
+            saids = [s for s in saids if s is not None]
+            if not any(abs(abs(s) - abs(line_val)) <= 1 for s in saids):
                 items.append(Item("amount", f"${m.group(1)}", "flagged", slide, reason=f"script calls it the {phrase} but the return's {phrase} line shows {line_val:,}"))
             break
 

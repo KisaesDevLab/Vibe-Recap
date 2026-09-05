@@ -49,7 +49,7 @@ def test_real_return_extracts_and_reconciles(idx):
     assert facts.filing_status == ex["meta"]["filing_status"], f"return-{idx}: verifier filing status differs"
     assert facts.states == ex["meta"]["state_returns"], f"return-{idx}: verifier states differ"
     assert facts.first_name and facts.first_name.casefold() == ident.first_name.casefold(), f"return-{idx}: verifier first name differs"
-    for key in ("total_income", "agi", "taxable_income", "total_tax"):
+    for key in ("total_income", "agi", "taxable_income", "total_tax", "withholding"):
         assert key in facts.lines, f"return-{idx}: verifier missing {key}"
     assert facts.lines["agi"] == ex["adjustments"]["agi"], f"return-{idx}: verifier AGI differs from extraction"
     assert facts.lines["total_tax"] == ex["tax"]["total_tax"], f"return-{idx}: verifier total tax differs"
