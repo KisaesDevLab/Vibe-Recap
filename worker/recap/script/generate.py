@@ -8,6 +8,7 @@ into the next attempt verbatim.
 from __future__ import annotations
 
 import hashlib
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
@@ -197,6 +198,66 @@ def generate(
     raise err
 
 
+class RevisionRejected(Exception):
+    """A revision request could not produce a passing script; the previous script stands."""
+
+    def __init__(self, message: str, attempts: list[dict[str, Any]]):
+        super().__init__(message)
+        self.attempts = attempts
+
+
+def revise(
+    ex: dict[str, Any],
+    settings: dict[str, Any],
+    note: str | None,
+    client: Ollama,
+    current_script: str,
+    instruction: str,
+    log: Any = None,
+    verifier: Verifier | None = None,
+) -> tuple[str, list[dict[str, Any]]]:
+    """Regenerate with a preparer's instruction, keeping the same hard gates.
+
+    The conversation is the original prompt, the current script as the assistant's last turn,
+    and the instruction. Numbers are still bound to FACTS; the instruction cannot add any.
+    """
+    messages = [
+        {"role": "system", "content": render_prompt("system", ex, settings, note)},
+        {"role": "user", "content": render_prompt("user", ex, settings, note)},
+        {"role": "assistant", "content": current_script},
+        {
+            "role": "user",
+            "content": (
+                "The preparer reviewed this script and asks for a revision:\n\n"
+                f"{instruction.strip()}\n\n"
+                "Rewrite the full script with that change. Keep every dollar figure and percentage exactly as they are "
+                "in FACTS, keep the seven tagged sections in order, keep it 250 to 450 words, and end with the same "
+                "closing sentence. Output the complete revised script only. /no_think"
+            ),
+        },
+    ]
+    attempts: list[dict[str, Any]] = []
+    last_errors: list[str] = []
+    for n in range(1, MAX_ATTEMPTS + 1):
+        result = client.chat(messages)
+        script = result.content.strip()
+        v = validate_script(script, ex)
+        errors = list(v.errors)
+        if v.ok and verifier is not None:
+            errors = [f"verification: {e}" for e in verifier(script)]
+        ok = not errors
+        attempts.append({"attempt": n, "ok": ok, "errors": errors[:10], "words": v.word_count, "ms": result.total_ms})
+        if log:
+            log.info("revision attempt", extra={"attempt": n, "ok": ok, "words": v.word_count, "error_count": len(errors)})
+        if ok:
+            return script, attempts
+        last_errors = errors
+        v.errors = errors
+        messages.append({"role": "assistant", "content": script})
+        messages.append({"role": "user", "content": format_errors_for_model(v)})
+    raise RevisionRejected("revision rejected after 3 attempts: " + "; ".join(last_errors[:5]), attempts)
+
+
 # ---------------------------------------------------------------------------
 # Pipeline step bodies
 # ---------------------------------------------------------------------------
@@ -249,6 +310,34 @@ def generate_script(ctx: Any) -> None:
         v = verify(candidate, str(ctx.source_pdf), str(ctx.prior_pdf) if ctx.prior_pdf else None, ctx.cfg.profiles_dir)
         return [f"{i.kind} {i.text}: {i.reason}" for i in v.items if i.status == "flagged"]
 
+    revision = ctx.db.pending_revision(ctx.job_id)
+    if revision:
+        # Chat-style revision: regenerate from the current script with the preparer's instruction.
+        from ..pipeline import load_file
+
+        current = ctx.script
+        if current is None:
+            raw = load_file(ctx, "script")
+            current = raw.decode("utf-8") if raw else ""
+        if not current:
+            ctx.db.update_revision(str(revision["id"]), status="rejected", error="no current script to revise", resolved_at=datetime.now(timezone.utc))
+            raise StepFailed("script", "no current script to revise; regenerate first")
+        try:
+            script, attempts = revise(ctx.extraction, ctx.settings, ctx.job.get("note"), client, current, revision["message"], ctx.log, verifier=verifier)
+        except OllamaError as exc:
+            ctx.db.update_revision(str(revision["id"]), status="rejected", error=str(exc)[:1000], resolved_at=datetime.now(timezone.utc))
+            raise StepFailed("script", str(exc)) from exc
+        except RevisionRejected as exc:
+            ctx.db.update_revision(str(revision["id"]), status="rejected", error=str(exc)[:1000], attempts=exc.attempts, resolved_at=datetime.now(timezone.utc))
+            ctx.db.add_event(ctx.job_id, "processing", "script", "revision rejected; previous script kept", {"revision_id": str(revision["id"]), "attempts": exc.attempts})
+            raise RevisionKept(str(revision["previous_status"]), str(exc)) from exc
+        ctx.script = script
+        sha = replace_file(ctx, "script", script.encode("utf-8"))
+        ctx.db.update_job(ctx.job_id, script_sha256=sha)
+        ctx.db.update_revision(str(revision["id"]), status="applied", script_sha256_after=sha, attempts=attempts, resolved_at=datetime.now(timezone.utc))
+        ctx.db.add_event(ctx.job_id, "processing", "script", f"revision applied in {len(attempts)} attempt(s)", {"revision_id": str(revision["id"]), "attempts": attempts})
+        return
+
     try:
         script, attempts = generate(ctx.extraction, ctx.settings, ctx.job.get("note"), client, ctx.log, verifier=verifier)
     except OllamaError as exc:
@@ -262,6 +351,14 @@ def generate_script(ctx: Any) -> None:
     sha = replace_file(ctx, "script", script.encode("utf-8"))
     ctx.db.update_job(ctx.job_id, script_sha256=sha)
     ctx.db.add_event(ctx.job_id, "processing", "script", f"script generated in {len(attempts)} attempt(s)", {"attempts": attempts, "extraction_sha256": ctx.extraction_sha256})
+
+
+class RevisionKept(Exception):
+    """Raised when a revision is rejected: the pipeline restores the job's previous status."""
+
+    def __init__(self, previous_status: str, reason: str):
+        super().__init__(reason)
+        self.previous_status = previous_status
 
 
 def validate_current_script(ctx: Any) -> None:

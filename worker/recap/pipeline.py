@@ -29,6 +29,7 @@ from .extract.mapper import ExtractionError
 from .extract.recon import failures
 from .extract.run import extract_return
 from .logging import get_logger
+from .script.generate import RevisionKept
 from .storage import Storage
 
 STEPS = ["ingest", "identify", "extract", "ocr", "recon", "script", "validate", "verify", "tts", "slides", "mux", "ready"]
@@ -332,6 +333,14 @@ def run_job(cfg: Config, storage: Storage, job_id: str) -> dict[str, Any]:
             db.add_event(job_id, "processing", step, None, {"seconds": round(time.time() - t0, 1)})
         log.info("job ready", extra={"seconds": round(time.time() - ctx.started, 1)})
         return {"ok": True}
+    except RevisionKept as exc:
+        # A rejected revision changes nothing: the previous script, verification and video are
+        # intact, so the job goes back to where it was and the revision thread shows the reason.
+        prev = exc.previous_status if exc.previous_status in ("needs_review", "approved", "rejected", "failed") else "needs_review"
+        db.update_job(job_id, status=prev, step="ready" if prev == "needs_review" else job.get("step"), resume_from=None)
+        db.add_event(job_id, prev, "script", f"revision rejected, previous script kept: {str(exc)[:500]}")
+        log.info("revision rejected; previous status restored", extra={"status": prev})
+        return {"ok": False, "revision": "rejected"}
     except StepFailed as exc:
         db.update_job(job_id, status="failed", step=exc.step, error_step=exc.step, error_message=exc.message[:2000], failed_at=_now())
         db.add_event(job_id, "failed", exc.step, exc.message[:2000])

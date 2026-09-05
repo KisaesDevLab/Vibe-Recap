@@ -24,6 +24,9 @@ upload → identify → extract → recon gate → script (local LLM) → valida
 - **Two hard gates before any audio.** The validator rejects any dollar figure or percentage in the
   script that does not exist in the extracted JSON. The verifier then re-reads the uploaded PDF on
   its own and traces every amount and fact in the script to a page and line of the return.
+- **Changes by instruction.** A preparer can ask for changes in plain English on the job page;
+  the script is rewritten with that instruction and runs through the same gates again. A rewrite
+  that fails them leaves the previous script and video in place.
 - **Preparer approval before release.** Approve snapshots the script, the extraction, and the
   verification. Delivery is download only: MP4, captions, transcript, or one ZIP.
 - **Retention is a job, not a promise.** An hourly purge is the only thing that deletes files, and

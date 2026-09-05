@@ -52,8 +52,12 @@ total tax (verifier now feeds back into the retry loop), and the "tax year exact
   completion that returned `policy_blocked` with Recap's operator message, which is the expected
   state until an admin binds a model to the class. A served completion needs a bound model
   (router console > Policies); not exercised here.
-- Vibe Appliance packaging lives in `.appliance/` (Q38); the two appliance-repo edits it needs
-  are listed there. Not yet exercised on an appliance host.
+- Vibe Appliance packaging lives in `.appliance/` (Q38) and was applied to the Vibe-Appliance
+  repo (manifest, overlay, env template, emergency port 5183, preflight list); its 34 manifest
+  tests pass with Recap included. Not yet exercised on an appliance host.
+- Revision requests (Q40): `job_revisions` table, `POST /api/jobs/:id/revisions`, worker
+  `revise()` in `script/generate.py`, `RevisionKept` restores the previous status on rejection,
+  "Ask for changes" panel on the job page.
 
 ## Deviations from the plan
 

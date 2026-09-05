@@ -267,3 +267,19 @@ export interface VerificationResponse {
   /** True when the stored verification was produced for a different script than the current one. */
   stale: boolean;
 }
+
+// ---------------------------------------------------------------------------
+// Revision requests (chat-style change instructions for the script)
+// ---------------------------------------------------------------------------
+
+export interface RevisionDto {
+  id: string;
+  message: string;
+  status: "pending" | "applied" | "rejected";
+  requestedBy: string;
+  createdAt: string;
+  resolvedAt: string | null;
+  error: string | null;
+  attempts: number;
+  scriptSha256After: string | null;
+}

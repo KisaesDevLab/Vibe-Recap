@@ -251,3 +251,35 @@ export type Batch = typeof batches.$inferSelect;
 export type Job = typeof jobs.$inferSelect;
 export type FileRow = typeof files.$inferSelect;
 export type JobEvent = typeof jobEvents.$inferSelect;
+
+// ---------------------------------------------------------------------------
+// Revision requests: a per-job thread of change instructions for the script.
+// Each message becomes one regenerate-with-instructions pass through the same
+// validate -> verify -> render gates. Nothing here bypasses them.
+// ---------------------------------------------------------------------------
+
+export const jobRevisions = pgTable(
+  "job_revisions",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    jobId: uuid("job_id")
+      .notNull()
+      .references(() => jobs.id, { onDelete: "cascade" }),
+    requestedBy: uuid("requested_by")
+      .notNull()
+      .references(() => users.id),
+    requestedByLabel: text("requested_by_label").notNull(),
+    message: text("message").notNull(),
+    status: text("status").notNull().default("pending"), // pending | applied | rejected
+    previousStatus: text("previous_status").notNull(),
+    scriptSha256Before: text("script_sha256_before"),
+    scriptSha256After: text("script_sha256_after"),
+    attempts: jsonb("attempts").$type<unknown[]>().notNull().default([]),
+    error: text("error"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+  },
+  (t) => [index("job_revisions_job_idx").on(t.jobId)],
+);
+
+export type JobRevision = typeof jobRevisions.$inferSelect;

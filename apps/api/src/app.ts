@@ -26,6 +26,7 @@ import { userRoutes } from "./routes/users.js";
 import { auditRoutes } from "./routes/audit.js";
 import { licenseRoutes } from "./routes/license.js";
 import { settingsRoutes } from "./routes/settings.js";
+import { revisionRoutes } from "./routes/revisions.js";
 import { HttpLicenseClient, currentState, type LicenseClient, type LicenseState } from "./services/license.js";
 import type { Storage } from "./services/storage.js";
 import { Queues, type Stager } from "./services/queue.js";
@@ -134,6 +135,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   await app.register(auditRoutes);
   await app.register(licenseRoutes);
   await app.register(settingsRoutes);
+  await app.register(revisionRoutes);
 
   // Unlicensed after grace = read-only: refuse state-changing calls except auth, setup, invites, and license entry.
   const LICENSE_EXEMPT = /^\/api\/(auth|setup|invite|settings\/license)/;

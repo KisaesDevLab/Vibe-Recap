@@ -64,6 +64,21 @@ class Db:
                 "delete from files where job_id = %s and kind = any(%s) returning *", (job_id, kinds)
             ).fetchall()
 
+    # -- revision requests (chat-style change instructions for the script) ---
+    def pending_revision(self, job_id: str) -> dict[str, Any] | None:
+        with self.conn() as c:
+            return c.execute(
+                "select * from job_revisions where job_id = %s and status = 'pending' order by created_at limit 1", (job_id,)
+            ).fetchone()
+
+    def update_revision(self, revision_id: str, **fields: Any) -> None:
+        if not fields:
+            return
+        cols = ", ".join(f"{k} = %s" for k in fields)
+        vals = [json.dumps(v) if isinstance(v, (dict, list)) else v for v in fields.values()]
+        with self.conn() as c:
+            c.execute(f"update job_revisions set {cols} where id = %s", (*vals, revision_id))
+
     # -- settings / clients --------------------------------------------------
     def settings(self) -> dict[str, Any]:
         with self.conn() as c:

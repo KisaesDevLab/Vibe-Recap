@@ -62,6 +62,7 @@ def main() -> int:
     ap.add_argument("--fixture", default=str(ROOT / "tests/fixtures/ultratax-1040-2025-mfj-refund-mo.pdf"))
     ap.add_argument("--email", default="smoke@example.com")
     ap.add_argument("--password", default="smoke-test-password-1")
+    ap.add_argument("--revise", default=None, help="after needs_review, request this revision and wait for it")
     args = ap.parse_args()
     api = Api(args.base)
 
@@ -104,6 +105,21 @@ def main() -> int:
     print("job", job["status"], job.get("step"), job.get("errorStep"), job.get("errorMessage"))
     for e in job["events"]:
         print("  ", e["at"], e["status"], e.get("step"), e.get("message"))
+    if args.revise and job["status"] == "needs_review":
+        code, rev = api.call("POST", f"/api/jobs/{job_id}/revisions", {"message": args.revise})
+        print("revision", code, rev)
+        for _ in range(900):
+            code, job = api.call("GET", f"/api/jobs/{job_id}")
+            if job["status"] not in ("queued", "processing"):
+                break
+            time.sleep(2)
+        code, thread = api.call("GET", f"/api/jobs/{job_id}/revisions")
+        for r in thread["revisions"]:
+            print("  revision:", r["status"], r["attempts"], "attempt(s)", r.get("error") or "")
+        code, s = api.call("GET", f"/api/jobs/{job_id}/script")
+        print("--- revised script ---")
+        print((s.get("script") or "")[:1200])
+        print("job", job["status"])
     return 0 if job["status"] in ("needs_review", "failed") else 2
 
 
