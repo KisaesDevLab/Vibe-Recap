@@ -93,9 +93,17 @@ export async function currentState(app: FastifyInstance, now = new Date()): Prom
     lastValidAt: row?.lastValidAt?.toISOString() ?? null,
     message: row?.message ?? null,
   };
-  if (!key) return { ...base, message: "No license key entered" };
-  if (!row || row.key !== key) return { ...base, status: "unlicensed", message: "License not yet checked" };
-  const graceEnd = row.lastValidAt ? row.lastValidAt.getTime() + GRACE_DAYS * 86400_000 : 0;
+  // A fresh install gets GRACE_DAYS from the day the first user was created, so a firm can set
+  // up and evaluate before the licensing server has been reached (or a key entered).
+  const [first] = await app.db.select({ createdAt: users.createdAt }).from(users).orderBy(users.createdAt).limit(1);
+  const installGraceEnd = (first?.createdAt ?? now).getTime() + GRACE_DAYS * 86400_000;
+  const trial = (msg: string): LicenseState =>
+    installGraceEnd > now.getTime()
+      ? { ...base, status: "grace", readOnly: false, message: `${msg}; trial period until ${new Date(installGraceEnd).toISOString().slice(0, 10)}` }
+      : { ...base, message: `${msg}; the trial period has ended and the app is read-only` };
+  if (!key) return trial("No license key entered");
+  if (!row || row.key !== key) return trial("License not yet checked");
+  const graceEnd = Math.max(row.lastValidAt ? row.lastValidAt.getTime() + GRACE_DAYS * 86400_000 : 0, installGraceEnd);
   if (row.status === "valid" && (!row.validUntil || row.validUntil.getTime() > now.getTime())) {
     return { ...base, status: "valid", readOnly: false };
   }

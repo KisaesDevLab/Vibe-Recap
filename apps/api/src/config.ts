@@ -16,6 +16,8 @@ const schema = z.object({
   OLLAMA_MODEL: z.string().default("qwen3:8b"),
   OLLAMA_OCR_MODEL: z.string().default("glm-ocr"),
   LICENSE_SERVER_URL: z.string().default("https://licensing.kisaes.com"),
+  /** Read-only enforcement when unlicensed. Defaults to on in production; set false for evaluation without a licensing server. */
+  LICENSE_ENFORCE: bool.optional(),
   MASTER_KEY_PASSPHRASE: z.string().optional(),
   LOG_LEVEL: z.string().default("info"),
   COOKIE_SECURE: bool.default(true),

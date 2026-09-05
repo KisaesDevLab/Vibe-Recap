@@ -29,4 +29,5 @@ to keep building; they are not locked and can be reversed. Locked decisions live
 | Q32 | Where do form profiles live at runtime so a firm can fix one without rebuilding? | Seeded from the image into `data/form-profiles` on the worker's first start (never overwritten), used by the worker from there, and included in the settings export/import. | 9 |
 | Q33 | Invite links need somewhere to live without a new table. | Redis key `invite:<token>` with a 24 h TTL, single use. | 9 |
 | Q34 | On this Windows dev box (Docker Desktop VM) one Qwen3-8B script attempt exceeds 180 s. | Timeout is now a firm setting (default 600 s). The M6 is expected to be faster natively; measure there and lower it if warranted. | 9 |
+| Q35 | A fresh install with no key (or no reachable licensing server yet) was read-only from the first minute, which blocks evaluation and the first-run experience. | 14-day trial from the day the first user is created; after that, unlicensed means read-only. `LICENSE_ENFORCE=false` disables the gate for evaluation boxes. | 9 |
 

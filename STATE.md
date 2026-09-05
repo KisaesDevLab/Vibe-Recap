@@ -16,6 +16,18 @@ Updated by Claude Code at the end of each phase. Read after CLAUDE.md, docs/PLAN
 | 8 Retention and purge | done 2026-09-05 | hourly purge is the only deleter; time-travel tests at the window edge; legal hold; purge-now with dry-run preview; per-client purge with typed confirmation; orphan quarantine at startup; retention settings page + CSV report |
 | 9 Users, audit UI, licensing, backup, docs | done 2026-09-05 | users CRUD with invites and last-admin protection, audit log UI + CSV, licensing with grace and read-only gate, general settings + Test Ollama, settings/profile export-import, GHCR workflow with SBOM, INSTALL.md final. Ship gate (a non-author CPA follows INSTALL.md on a fresh host) not yet exercised |
 
+## Not yet verified (needs the M6 or real inputs)
+
+- `docker compose up --build` on the reference box (Ubuntu 24.04). Everything so far ran on a
+  Windows 11 dev box under Docker Desktop, where the stack came up, staged uploads through the real
+  worker, extracted and reconciled fixtures, and rendered videos in tests.
+- A real UltraTax return from the practice (Phase 3 success criterion). Only synthetic fixtures exist.
+- GLM-OCR's real output format (Q19). OCR tests use a stand-in engine.
+- The licensing server contract (Q31). Tests use a fake client.
+- The ship gate: a CPA who is not the author following INSTALL.md on a fresh host.
+- Script quality with the real model: one CPU run on this box exceeded the original 180 s
+  timeout; the timeout is now 600 s and thinking is disabled. Re-run `scripts/smoke-e2e.py`.
+
 ## Deviations from the plan
 
 - Phase 2: the "kill the worker mid-job, the rest continue" test is deferred to Phase 3 where the

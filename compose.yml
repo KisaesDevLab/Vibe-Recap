@@ -55,6 +55,7 @@ services:
       OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3:8b}
       OLLAMA_OCR_MODEL: ${OLLAMA_OCR_MODEL:-glm-ocr}
       LICENSE_SERVER_URL: ${LICENSE_SERVER_URL:-https://licensing.kisaes.com}
+      LICENSE_ENFORCE: ${LICENSE_ENFORCE:-true}
       MASTER_KEY_PASSPHRASE: ${MASTER_KEY_PASSPHRASE:-}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       COOKIE_SECURE: ${COOKIE_SECURE:-true}

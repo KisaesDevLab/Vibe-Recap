@@ -17,7 +17,7 @@ async function main() {
   const redis = createRedis(config.REDIS_URL);
   const storage = new Storage(config.DATA_DIR, config.MASTER_KEY_PASSPHRASE);
   await storage.init();
-  const app = await buildApp({ config, db, redis, storage, cron: true, enforceLicense: config.NODE_ENV === "production" });
+  const app = await buildApp({ config, db, redis, storage, cron: true, enforceLicense: config.LICENSE_ENFORCE ?? config.NODE_ENV === "production" });
   checkLicense(app, app.licenseClient).catch((err) => app.log.warn({ err }, "initial license check failed"));
   await orphanCheck(app).catch((err) => app.log.error({ err }, "orphan check failed"));
 

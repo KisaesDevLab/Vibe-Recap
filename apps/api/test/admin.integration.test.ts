@@ -40,7 +40,13 @@ describe.skipIf(!available)("users, invites, licensing, settings backup", () => 
     await ctx?.close();
   });
 
-  it("unlicensed installs are read-only except for auth, setup, invites, and the license key", async () => {
+  it("unlicensed installs are read-only after the 14-day trial, except for auth, setup, invites, and the license key", async () => {
+    // within the trial: writes allowed
+    const trial = await admin.post("/api/clients", { name: "Trial, Client" });
+    expect(trial.statusCode).toBe(201);
+    // time-travel the install date past the trial
+    await ctx.db.update(users).set({ createdAt: new Date(Date.now() - 15 * 86400_000) });
+    Object.assign(ctx.app.licenseState, await currentState(ctx.app));
     const denied = await admin.post("/api/clients", { name: "Blocked, Client" });
     expect(denied.statusCode).toBe(402);
     const lic = await admin.request("PUT", "/api/settings/license", { key: "RECAP-TEST-KEY-0001" });
