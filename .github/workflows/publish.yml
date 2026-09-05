@@ -88,7 +88,7 @@ jobs:
         run: |
           tag="$(echo "${{ steps.meta.outputs.tags }}" | head -n1)"
           for cmd in seed-admin migrate; do
-            docker run --rm --entrypoint "$cmd" "$tag" >/dev/null 2>&1; rc=$?
+            rc=0; docker run --rm --entrypoint "$cmd" "$tag" >/dev/null 2>&1 || rc=$?  # the step runs with -e
             echo "$cmd exit=$rc"
             test "$rc" -ne 127 && test "$rc" -ne 126 || { echo "$cmd is not on PATH in the api image"; exit 1; }
           done
