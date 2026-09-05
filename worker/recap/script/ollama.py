@@ -64,6 +64,10 @@ class Ollama:
             "model": self.model,
             "messages": messages,
             "stream": False,
+            # Qwen3 thinking is off: it costs a thousand tokens per answer on CPU and the validator
+            # loop is the reasoning we want. Older Ollama versions ignore the field; the /no_think
+            # marker in the prompts covers them.
+            "think": False,
             "options": {"temperature": self.temperature, "num_ctx": self.num_ctx, "num_predict": max_tokens},
         }
         try:

@@ -229,4 +229,12 @@ Append as phases complete:
 - Phase N completed YYYY-MM-DD by <author>. Deviations: <none | description>. Test host: <host>.
 ```
 
-(Empty until Phase 1 ships.)
+- Phase 1 completed 2026-09-05 by Claude Code. Deviations: none. Test host: Windows 11 dev box (Docker Desktop); not yet run on the M6.
+- Phase 2 completed 2026-09-05 by Claude Code. Deviations: staging runs in the worker over a second queue (Q11); the mid-job worker-kill test moved to Phase 3. Test host: Windows 11 dev box.
+- Phase 3 completed 2026-09-05 by Claude Code. Deviations: re-extract continues through the pipeline (Q16). Test host: Windows 11 dev box.
+- Phase 4 completed 2026-09-05 by Claude Code. Deviations: tested with a stand-in OCR engine; real GLM-OCR output format unverified (Q19). Test host: Windows 11 dev box.
+- Phase 5 completed 2026-09-05 by Claude Code. Deviations: none. Test host: Windows 11 dev box.
+- Phase 6 completed 2026-09-05 by Claude Code. Deviations: ffmpeg xfade instead of the concat demuxer for video (Q23); passkeys/TOTP deferred (Q25). Test host: Windows 11 dev box.
+- Phase 7 completed 2026-09-05 by Claude Code. Deviations: none. Test host: Windows 11 dev box.
+- Phase 8 completed 2026-09-05 by Claude Code. Deviations: source retention anchored on ready/failed rather than upload (Q29). Test host: Windows 11 dev box.
+- Phase 9 completed 2026-09-05 by Claude Code. Deviations: licensing contract assumed (Q31); ship gate (a non-author CPA on a fresh host) not yet exercised. Test host: Windows 11 dev box.
