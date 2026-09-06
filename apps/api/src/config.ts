@@ -15,9 +15,6 @@ const schema = z.object({
   OLLAMA_URL: z.string().default("http://ollama:11434"),
   OLLAMA_MODEL: z.string().default("qwen3:8b"),
   OLLAMA_OCR_MODEL: z.string().default("glm-ocr"),
-  LICENSE_SERVER_URL: z.string().default("https://licensing.kisaes.com"),
-  /** Read-only enforcement when unlicensed. Defaults to on in production; set false for evaluation without a licensing server. */
-  LICENSE_ENFORCE: bool.optional(),
   /** Vibe AI Router (default script-generation provider). Empty token = bundled Ollama. */
   VIBE_AI_ROUTER_URL: z.string().default("http://vibe-ai-router:8220"),
   VIBE_AI_TOKEN: z.string().default(""),

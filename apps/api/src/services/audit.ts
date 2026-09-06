@@ -8,7 +8,6 @@ export interface Actor {
 
 export const SYSTEM_RETENTION: Actor = { id: null, label: "system:retention" };
 export const SYSTEM_STARTUP: Actor = { id: null, label: "system:startup" };
-export const SYSTEM_LICENSE: Actor = { id: null, label: "system:license" };
 export const SYSTEM_WORKER: Actor = { id: null, label: "system:worker" };
 export const ANONYMOUS: Actor = { id: null, label: "anonymous" };
 

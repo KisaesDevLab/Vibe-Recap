@@ -237,4 +237,4 @@ Append as phases complete:
 - Phase 6 completed 2026-09-05 by Claude Code. Deviations: ffmpeg xfade instead of the concat demuxer for video (Q23); passkeys/TOTP deferred (Q25). Test host: Windows 11 dev box.
 - Phase 7 completed 2026-09-05 by Claude Code. Deviations: none. Test host: Windows 11 dev box.
 - Phase 8 completed 2026-09-05 by Claude Code. Deviations: source retention anchored on ready/failed rather than upload (Q29). Test host: Windows 11 dev box.
-- Phase 9 completed 2026-09-05 by Claude Code. Deviations: licensing contract assumed (Q31); ship gate (a non-author CPA on a fresh host) not yet exercised. Test host: Windows 11 dev box.
+- Phase 9 completed 2026-09-05 by Claude Code. Deviations: licensing contract assumed (Q31); ship gate (a non-author CPA on a fresh host) not yet exercised. Test host: Windows 11 dev box. Deliverable 3 (licensing) was removed later the same day on Kurt's instruction (QUESTIONS.md Q49).

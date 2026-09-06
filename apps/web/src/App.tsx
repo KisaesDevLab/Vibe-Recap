@@ -16,7 +16,7 @@ import { SettingsGeneralPage } from "./pages/SettingsGeneral";
 import { SettingsUsersPage } from "./pages/SettingsUsers";
 import { SettingsAuditPage } from "./pages/SettingsAudit";
 import { SettingsQualityPage } from "./pages/SettingsQuality";
-import { SettingsBackupPage, SettingsLicensePage } from "./pages/SettingsLicenseBackup";
+import { SettingsBackupPage } from "./pages/SettingsBackup";
 import { InvitePage } from "./pages/Invite";
 import { ForgotPasswordPage } from "./pages/ForgotPassword";
 import { ResetPasswordPage } from "./pages/ResetPassword";
@@ -105,7 +105,6 @@ export function App() {
           <Route path="email" element={<SettingsEmailPage />} />
           <Route path="audit" element={<SettingsAuditPage />} />
           <Route path="quality" element={<SettingsQualityPage />} />
-          <Route path="license" element={<SettingsLicensePage />} />
           <Route path="backup" element={<SettingsBackupPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

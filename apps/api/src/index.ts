@@ -6,7 +6,6 @@ import { buildApp } from "./app.js";
 import { createLogger } from "./logger.js";
 import { Storage } from "./services/storage.js";
 import { orphanCheck } from "./services/purge.js";
-import { checkLicense } from "./services/license.js";
 import { registerTaskClasses } from "./services/airouter.js";
 
 async function main() {
@@ -22,8 +21,7 @@ async function main() {
   const redis = createRedis(config.REDIS_URL);
   const storage = new Storage(config.DATA_DIR, config.MASTER_KEY_PASSPHRASE);
   await storage.init();
-  const app = await buildApp({ config, db, redis, storage, cron: true, enforceLicense: config.LICENSE_ENFORCE ?? config.NODE_ENV === "production" });
-  checkLicense(app, app.licenseClient).catch((err) => app.log.warn({ err }, "initial license check failed"));
+  const app = await buildApp({ config, db, redis, storage, cron: true });
   registerTaskClasses(app)
     .then((r) => app.log.info({ configured: r.configured, reachable: r.reachable, registered: r.registered, error: r.error }, "ai router"))
     .catch((err) => app.log.warn({ err }, "ai router registration failed"));

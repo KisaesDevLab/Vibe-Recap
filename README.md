@@ -73,7 +73,7 @@ baked into the worker image for production.
 
 | Path | What |
 |---|---|
-| `apps/api` | Fastify 5 API: auth, uploads, jobs, review, release, retention, users, audit, licensing |
+| `apps/api` | Fastify 5 API: auth, uploads, jobs, review, release, retention, users, audit, email |
 | `apps/web` | React 19 + Vite + Tailwind UI |
 | `worker` | Python pipeline: extraction, reconciliation, script, validator, verifier, narration, slides, video |
 | `packages/shared` | Types and the script validator mirror shared by web and api |
@@ -84,7 +84,8 @@ baked into the worker image for production.
 
 ## License
 
-PolyForm Small Business License 1.0.0. See [`LICENSE`](LICENSE). Licensed installs validate
-against `licensing.kisaes.com`, the only outbound connection the API makes.
+PolyForm Small Business License 1.0.0. See [`LICENSE`](LICENSE). There is no license key and no
+phone-home: the API's only outbound connections are the Vibe AI Router and, when an admin turns
+on outgoing email, Emailit.
 
 Built by [Kisaes LLC](https://kisaes.com).

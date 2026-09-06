@@ -14,7 +14,7 @@ Updated by Claude Code at the end of each phase. Read after CLAUDE.md, docs/PLAN
 | 6 Render, review, approval | done 2026-09-05 | Kokoro per-sentence narration, Jinja/Playwright slides, ffmpeg xfade mux, VTT/TXT; approve with three-hash snapshot, reject, re-render, bulk approve; whole-pipeline test produces an MP4. Passkeys/TOTP deferred (Q25) |
 | 7 Release and download | done 2026-09-05 | release, role/state-gated downloads with one audit row each, package ZIP, batch release-all and download-all (ZIP of ZIPs), delivered checkbox, dashboard filters |
 | 8 Retention and purge | done 2026-09-05 | hourly purge is the only deleter; time-travel tests at the window edge; legal hold; purge-now with dry-run preview; per-client purge with typed confirmation; orphan quarantine at startup; retention settings page + CSV report |
-| 9 Users, audit UI, licensing, backup, docs | done 2026-09-05 | users CRUD with invites and last-admin protection, audit log UI + CSV, licensing with grace and read-only gate, general settings + Test Ollama, settings/profile export-import, GHCR workflow with SBOM, INSTALL.md final. Ship gate (a non-author CPA follows INSTALL.md on a fresh host) not yet exercised |
+| 9 Users, audit UI, licensing, backup, docs | done 2026-09-05 | users CRUD with invites and last-admin protection, audit log UI + CSV, licensing with grace and read-only gate, general settings + Test Ollama, settings/profile export-import, GHCR workflow with SBOM, INSTALL.md final. Ship gate (a non-author CPA follows INSTALL.md on a fresh host) not yet exercised. Licensing removed later the same day (Q49) |
 
 ## Not yet verified (needs the M6 or real inputs)
 
@@ -23,7 +23,6 @@ Updated by Claude Code at the end of each phase. Read after CLAUDE.md, docs/PLAN
   worker, extracted and reconciled fixtures, and rendered videos in tests.
 - A real UltraTax return from the practice (Phase 3 success criterion). Only synthetic fixtures exist.
 - GLM-OCR's real output format (Q19). OCR tests use a stand-in engine.
-- The licensing server contract (Q31). Tests use a fake client.
 - The ship gate: a CPA who is not the author following INSTALL.md on a fresh host.
 
 ## Verified end to end on the dev box (2026-09-05)
@@ -46,7 +45,8 @@ total tax (verifier now feeds back into the retry loop), and the "tax year exact
 - Vibe AI Router is the default script provider (Q37); bundled Ollama is the local option. The
   worker reaches the router only through a socat relay so it never joins a network with an
   internet route. `recap_script` is registered by the API at startup.
-- Licensing is informational until the server exists (`LICENSE_ENFORCE=false`, Q35).
+- Licensing was removed entirely (Q49, 2026-09-05): no key, no server, no read-only gate, no
+  `licenses` table (migration 0004 drops it). The product is PolyForm-licensed, nothing more.
 - Verified against the real Vibe-AI-Router dev server (0.0.27) on this box: admin login, app
   token mint, `POST /v1/task-classes/register` (created `recap_script`, `local_only`), and a
   completion that returned `policy_blocked` with Recap's operator message, which is the expected
@@ -102,9 +102,7 @@ total tax (verifier now feeds back into the retry loop), and the "tax year exact
   winget ffmpeg lives under `AppData/Local/Microsoft/WinGet/Packages/Gyan.FFmpeg_*` and must be on
   PATH for the mux tests; they skip otherwise. `approvalCheck()` in `routes/review.ts` is the single
   source of approval rules; bulk approve calls it per job.
-- Phase 9: the license gate is a preHandler in `app.ts` that reads the shared `app.licenseState`
-  object (mutate it with `Object.assign`, never reassign: route contexts are encapsulated).
-  `enforceLicense` is on only in production; tests pass a fake `LicenseClient`. Settings values are
+- Phase 9: settings values are
   written as jsonb (`'null'::jsonb` for null). Form profiles are read from `DATA_DIR/form-profiles`.
 
 - Phase 1: `npm run test:services` starts a throwaway Postgres (55432) and Redis (56379) that the

@@ -56,7 +56,7 @@ What starts:
 |---|---|
 | `caddy` | TLS and reverse proxy on 80/443 |
 | `web` | the React UI |
-| `api` | Fastify API, auth, settings, retention, audit, licensing |
+| `api` | Fastify API, auth, settings, retention, audit, email |
 | `worker` | extraction, script, verification, narration, video. No internet route. |
 | `ollama` | the language model (and OCR model) |
 | `ollama-init` | one-shot model download, exits when done |
@@ -98,7 +98,6 @@ Passwords need 12 characters or more and cannot be one of the 100,000 most commo
 
 Settings > General: firm name, logo, colors, sign-off sentence, narration voice.
 Settings > Retention: how long source PDFs, scripts, and videos stay. Defaults 30 / 365 / 90 days.
-Settings > License: paste the key from your Kisaes order. Without it the app is read-only.
 Settings > Users: add preparers and staff; invite links are valid for 24 hours.
 Settings > Email: optional outgoing email so invites and password resets arrive by email (section 6c).
 
@@ -197,7 +196,6 @@ Keep a separate offline copy of `data/keys/master.key`. Without it the blobs can
 | Worker logs `PermissionError` on `/data/keys` | `RECAP_DATA` is owned by another user. Both containers run as uid 1000; `sudo chown -R 1000:1000 data`. |
 | "worker restarted mid-job" on a job | The worker was restarted while processing. Click *Retry*; it resumes at that step. |
 | Upload says "PDF is password-protected" | Remove the password in the tax software's print dialog and upload again. |
-| Everything is read-only | Settings > License: the key is missing, rejected, or the licensing server has been unreachable for more than 14 days. |
 | *Forgot your password?* is missing from the sign-in page | Outgoing email is off. An admin turns it on under Settings > Email (section 6c) or resets the password with a temporary one under Settings > Users. |
 | Reset or invite emails do not arrive | Settings > Email > *Send test message* shows Emailit's answer. Common causes: the sender address is not on a verified Emailit domain, the key is limited to another domain, or the message is in spam. Failed sends are in the audit log as `auth.password_reset_email_failed`. |
 | Links in emails point at the wrong host | Set *Public URL* under Settings > Email (or `PUBLIC_URL` in `.env`). |

@@ -3,78 +3,21 @@ import path from "node:path";
 import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Client, createTestContext, servicesAvailable, type TestContext } from "./helpers.js";
-import { licenses, users } from "../src/db/schema.js";
-import { checkLicense, currentState, type LicenseClient } from "../src/services/license.js";
+import { users } from "../src/db/schema.js";
 
 const available = await servicesAvailable();
 
-class FakeLicense implements LicenseClient {
-  mode: "valid" | "invalid" | "down" = "valid";
-  calls = 0;
-  async validate() {
-    this.calls++;
-    if (this.mode === "down") throw new Error("ECONNREFUSED");
-    if (this.mode === "invalid") return { valid: false, message: "key revoked" };
-    return { valid: true, expires_at: new Date(Date.now() + 365 * 86400_000).toISOString(), max_seats: 3 };
-  }
-}
-
-describe.skipIf(!available)("users, invites, licensing, settings backup", () => {
+describe.skipIf(!available)("users, invites, settings backup", () => {
   let ctx: TestContext;
   let admin: Client;
-  const fake = new FakeLicense();
 
   beforeAll(async () => {
     ctx = await createTestContext();
-    // rebuild the app with the fake licensing client and enforcement on
-    await ctx.app.close();
-    const { buildApp } = await import("../src/app.js");
-    const { createRedis } = await import("../src/services/redis.js");
-    const redis = createRedis(ctx.config.REDIS_URL);
-    ctx.app = await buildApp({ config: ctx.config, db: ctx.db, redis, storage: ctx.storage, stager: ctx.stager, licenseClient: fake, enforceLicense: true });
-    await ctx.app.ready();
     admin = new Client(ctx.app);
     await admin.setup();
   });
   afterAll(async () => {
     await ctx?.close();
-  });
-
-  it("unlicensed installs are read-only after the 14-day trial, except for auth, setup, invites, and the license key", async () => {
-    // within the trial: writes allowed
-    const trial = await admin.post("/api/clients", { name: "Trial, Client" });
-    expect(trial.statusCode).toBe(201);
-    // time-travel the install date past the trial
-    await ctx.db.update(users).set({ createdAt: new Date(Date.now() - 15 * 86400_000) });
-    Object.assign(ctx.app.licenseState, await currentState(ctx.app));
-    const denied = await admin.post("/api/clients", { name: "Blocked, Client" });
-    expect(denied.statusCode).toBe(402);
-    const lic = await admin.request("PUT", "/api/settings/license", { key: "RECAP-TEST-KEY-0001" });
-    expect(lic.statusCode, lic.body).toBe(200);
-    expect(lic.json().status).toBe("valid");
-    expect(lic.json().key).toBeUndefined();
-    expect(lic.json().keyMasked).toBe("RECA…0001");
-    const allowed = await admin.post("/api/clients", { name: "Allowed, Client" });
-    expect(allowed.statusCode).toBe(201);
-  });
-
-  it("grace: unreachable server keeps the license valid for 14 days, then read-only", async () => {
-    fake.mode = "down";
-    const t = Date.now();
-    let st = await checkLicense(ctx.app, fake, new Date(t + 1 * 86400_000));
-    expect(st.status).toBe("grace");
-    expect(st.readOnly).toBe(false);
-    st = await checkLicense(ctx.app, fake, new Date(t + 15 * 86400_000));
-    expect(await currentState(ctx.app, new Date(t + 15 * 86400_000)).then((s) => s.status)).toBe("invalid");
-    fake.mode = "invalid";
-    st = await checkLicense(ctx.app, fake);
-    expect(st.status).toBe("invalid");
-    expect(st.message).toMatch(/revoked/);
-    fake.mode = "valid";
-    st = await checkLicense(ctx.app, fake);
-    expect(st.status).toBe("valid");
-    const rows = await ctx.db.select().from(licenses);
-    expect(rows.length).toBeGreaterThanOrEqual(4);
   });
 
   it("creates users with a temp password or an invite link, and enforces last-admin protection", async () => {
@@ -113,11 +56,6 @@ describe.skipIf(!available)("users, invites, licensing, settings backup", () => 
     await ctx.app.redis.del(`invite:${token2}`);
     expect((await anon.get(`/api/invite/${token2}`)).statusCode).toBe(404);
 
-    // seats: 3 licensed, now 4 active users -> message after the next check
-    const st = await checkLicense(ctx.app, fake);
-    expect(st.status).toBe("valid");
-    expect(st.seatsInUse).toBe(4);
-    expect(st.message).toMatch(/Seat count exceeded/);
   });
 
   it("promoting a second admin then demoting the first works; force logout drops sessions; reset password forces change", async () => {
@@ -146,7 +84,7 @@ describe.skipIf(!available)("users, invites, licensing, settings backup", () => 
     expect(list.statusCode).toBe(200);
     expect(list.json().events.every((e: { action: string }) => e.action.startsWith("user."))).toBe(true);
     expect(list.json().total).toBeGreaterThan(3);
-    const csv = await admin.get("/api/audit/export.csv?action=license.");
+    const csv = await admin.get("/api/audit/export.csv?action=user.");
     expect(csv.body.split("\n")[0]).toBe("id,at,actor,action,target_type,target_id,ip,meta");
 
     await fs.mkdir(path.join(ctx.dataDir, "form-profiles"), { recursive: true });
@@ -156,7 +94,7 @@ describe.skipIf(!available)("users, invites, licensing, settings backup", () => 
     expect(exp.statusCode).toBe(200);
     const doc = exp.json();
     expect(doc.settings.firm_name).toBe("Round Trip CPA");
-    expect(doc.settings.license_key).toBeUndefined();
+    expect(doc.settings.emailit_api_key).toBeUndefined();
     expect(doc.profiles["1040-2025-test.yaml"]).toContain("software: test");
 
     await admin.request("PUT", "/api/settings/general", { firm_name: "Changed", voice: "af_bella" });
@@ -167,8 +105,6 @@ describe.skipIf(!available)("users, invites, licensing, settings backup", () => 
     expect(after.json().settings.firm_name).toBe("Round Trip CPA");
     expect(after.json().settings.voice).toBe("am_adam");
     expect(await fs.readFile(path.join(ctx.dataDir, "form-profiles", "1040-2025-test.yaml"), "utf8")).toContain("software: test");
-    const lic = await ctx.db.execute<{ value: unknown }>(sql`select value from settings where key = 'license_key'`);
-    expect(lic[0]!.value).toBe("RECAP-TEST-KEY-0001"); // import never touches the key
   });
 
   it("test-ollama reports reachability without throwing", async () => {

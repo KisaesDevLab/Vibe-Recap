@@ -99,11 +99,6 @@
         "doc": "The appliance runs migrations explicitly (overlay one-shot at enable, update.sh at update)."
       },
       {
-        "name": "LICENSE_ENFORCE",
-        "from": "static:false",
-        "doc": "Kisaes licensing check stays informational until the licensing server is live (Vibe-Recap QUESTIONS.md Q35)."
-      },
-      {
         "name": "SEED_ADMIN_PASSWORD",
         "from": "generated:hex32",
         "secret": true,

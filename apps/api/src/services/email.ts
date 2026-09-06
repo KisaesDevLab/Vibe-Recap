@@ -10,8 +10,8 @@
  *   -> 200 { object: "email", id: "em_...", status: "pending", ... }
  *   -> 4xx { error: string, validation_errors?: string[] }
  *
- * api.emailit.com is the API container's third permitted outbound destination (with the licensing
- * server and the Vibe AI Router) and is only contacted when an admin has enabled the provider.
+ * api.emailit.com is one of the API container's two permitted outbound destinations (with the
+ * Vibe AI Router) and is only contacted when an admin has enabled the provider.
  */
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { getAllSettings } from "./settings.js";

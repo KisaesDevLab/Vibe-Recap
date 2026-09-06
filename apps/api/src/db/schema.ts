@@ -77,19 +77,6 @@ export const settings = pgTable("settings", {
   updatedBy: uuid("updated_by"),
 });
 
-export const licenses = pgTable("licenses", {
-  id: serial("id").primaryKey(),
-  key: text("key").notNull(),
-  status: text("status").notNull().default("unknown"),
-  lastCheckedAt: timestamp("last_checked_at", { withTimezone: true }),
-  lastValidAt: timestamp("last_valid_at", { withTimezone: true }),
-  validUntil: timestamp("valid_until", { withTimezone: true }),
-  seats: integer("seats"),
-  message: text("message"),
-  payload: jsonb("payload").$type<Record<string, unknown>>().notNull().default({}),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
-
 export type User = typeof users.$inferSelect;
 export type Session = typeof sessions.$inferSelect;
 export type AuditEvent = typeof auditEvents.$inferSelect;

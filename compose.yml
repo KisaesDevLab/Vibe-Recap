@@ -4,7 +4,7 @@
 # Networks:
 #   frontend  caddy <-> web/api
 #   backend   internal only (no internet): api, worker, postgres, redis, ollama
-#   egress    internet access: caddy (ACME), api (licensing.kisaes.com; api.emailit.com when outgoing email is on), ollama (model pulls)
+#   egress    internet access: caddy (ACME), api (api.emailit.com when outgoing email is on), ollama (model pulls)
 # The worker is attached to `backend` only, so it has no route to the internet.
 
 x-logging: &default-logging
@@ -54,8 +54,6 @@ services:
       OLLAMA_URL: ${OLLAMA_URL:-http://ollama:11434}
       OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3:8b}
       OLLAMA_OCR_MODEL: ${OLLAMA_OCR_MODEL:-glm-ocr}
-      LICENSE_SERVER_URL: ${LICENSE_SERVER_URL:-https://licensing.kisaes.com}
-      LICENSE_ENFORCE: ${LICENSE_ENFORCE:-false}
       VIBE_AI_ROUTER_URL: ${VIBE_AI_ROUTER_URL:-http://vibe-ai-router:8220}
       VIBE_AI_TOKEN: ${VIBE_AI_TOKEN:-}
       MASTER_KEY_PASSPHRASE: ${MASTER_KEY_PASSPHRASE:-}

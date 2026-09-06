@@ -60,7 +60,6 @@ describe.skipIf(!available)("outgoing email, password reset, change password", (
     const exp = await admin.get("/api/settings/backup/export");
     expect(exp.statusCode).toBe(200);
     expect(exp.json().settings.emailit_api_key).toBeUndefined();
-    expect(exp.json().settings.license_key).toBeUndefined();
     expect(exp.json().settings.email_from).toBe("recap@firm.example");
 
     // an import cannot smuggle a key in

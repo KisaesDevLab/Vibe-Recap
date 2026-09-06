@@ -13,7 +13,7 @@ Operational notes for Claude Code working in this repo. Read this first, then `d
 
 Vibe Recap is a standalone, self-hosted appliance for CPA firms. A preparer uploads a completed tax return package (v1: UltraTax CS client copies only, Q45; profiles for Lacerte, CCH Axcess, GoSystem, Drake and ProSeries exist but are unvalidated and skipped at upload). Recap extracts the key figures, generates a plain-English narrated video summary for the client, and lets the preparer review, approve, and download it for delivery through the firm's own channel. Everything runs on the firm's own hardware. No client data leaves the box.
 
-It is a **separate product** from the rest of the Vibe suite. It shares conventions and the licensing server, not code or a database. It must install and run on its own with a single `docker compose up`.
+It is a **separate product** from the rest of the Vibe suite. It shares conventions with the rest of the suite, not code or a database. It must install and run on its own with a single `docker compose up`.
 
 ## Execution model
 
@@ -42,10 +42,10 @@ It is a **separate product** from the rest of the Vibe suite. It shares conventi
 | Reverse proxy | Caddy (bundled), TLS via Tailscale cert, ACME, or self-signed |
 | Storage | Local volume `/data`; encrypted at rest with age (per-file keys wrapped by a master key in `/data/keys`) |
 | Backups | Duplicati sidecar (optional), same pattern as other Vibe apps |
-| Scheduled jobs | node-cron inside `api` (hourly purge, daily license check) |
+| Scheduled jobs | node-cron inside `api` (hourly purge, 10-minute staging sweep) |
 | Fixture generator | Python + ReportLab (`scripts/make-fixture.py`) |
 | Images | GHCR `ghcr.io/kisaesdevlab/vibe-recap-{web,api,worker}` |
-| License | PolyForm Small Business License 1.0.0 |
+| License | PolyForm Small Business License 1.0.0; no license key, no licensing server (Q49) |
 
 ## Commands
 
@@ -109,7 +109,7 @@ Cross-cutting rules that are easy to miss:
 1a. **Every amount and fact in the script must be verified against the uploaded return itself**, not just the extraction. The verifier (`worker/recap/verify/`) does its own text pass over the source PDF and traces each amount to a page and line label, recomputes percentages and YoY deltas from what it finds, and checks tax year, filing status, names, deduction type, refund-vs-owed direction, state presence, and PII absence. It must not import from `extract`. A job cannot reach `needs_review`, and Approve is disabled, while any verification item is flagged. Spec: `docs/PLAN.md` §5a.
 2. **Arithmetic reconciliation gate.** Extracted 1040 lines must foot to the return's own totals within $1 before a script is generated. Failures surface to the preparer as an extraction problem, not a silent video.
 3. **Preparer approval before release; delivery is download only.** No share links, no portal, no Vibe Connect. A video is never downloadable until a user with `preparer` or `admin` role clicks Approve. The approve action snapshots the script and the extracted JSON.
-4. **No outbound network calls from the worker** except to the Vibe AI Router (via `airouter-proxy` on the egress-denied network; default script-generation provider since Kurt's 2026-09-05 decision, QUESTIONS.md Q37) and to Ollama (bundled container, or the host gateway when `OLLAMA_URL` points at the host). Enforce with an egress-denied network in compose plus socat relays for exactly those two targets. The API container may reach `licensing.kisaes.com`, the router, and `api.emailit.com` (outgoing email to firm users only, off until an admin enables it; Kurt's 2026-09-05 decision, QUESTIONS.md Q48). There are no other integrations; do not add any. What leaves the box through the router is the script prompt (extracted figures, first names, filing status, states, preparer note), never the PDF; the router's task-class policy (`recap_script`) governs which provider serves it.
+4. **No outbound network calls from the worker** except to the Vibe AI Router (via `airouter-proxy` on the egress-denied network; default script-generation provider since Kurt's 2026-09-05 decision, QUESTIONS.md Q37) and to Ollama (bundled container, or the host gateway when `OLLAMA_URL` points at the host). Enforce with an egress-denied network in compose plus socat relays for exactly those two targets. The API container may reach the router and `api.emailit.com` (outgoing email to firm users only, off until an admin enables it; Kurt's 2026-09-05 decision, QUESTIONS.md Q48). The licensing server and license key were removed on Kurt's 2026-09-05 instruction (Q49); the product is PolyForm-licensed with no phone-home. There are no other integrations; do not add any. What leaves the box through the router is the script prompt (extracted figures, first names, filing status, states, preparer note), never the PDF; the router's task-class policy (`recap_script`) governs which provider serves it.
 5. **Retention is enforced by a job, not by trust.** The purge worker runs hourly and is the only thing that deletes files. Purges are logged to the audit table. A thumbs-down on a job (Q46) holds its files for 90 days or until an admin dismisses it; the hold moves the date, it never adds a deleter.
 6. **Extracted values are never hand-edited.** If a line is misread, the form profile is wrong. Fix the profile and re-extract. Recon failures may be downgraded to warnings per job by a preparer, with a reason, audited.
 7. **No PII in logs.** Log job IDs and file hashes, never names, SSNs, or amounts. Redact structured logs at the logger level, not by convention.
@@ -134,7 +134,7 @@ vibe-recap/
   Caddyfile
   apps/
     web/          React UI
-    api/          Fastify API, auth, settings, retention, audit, licensing
+    api/          Fastify API, auth, settings, retention, audit, email
   worker/
     recap/
       extract/    pdf text-layer mapper, form profiles, OCR fallback, recon gate

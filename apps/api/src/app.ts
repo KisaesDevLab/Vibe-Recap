@@ -24,11 +24,9 @@ import { releaseRoutes } from "./routes/release.js";
 import { retentionRoutes } from "./routes/retention.js";
 import { userRoutes } from "./routes/users.js";
 import { auditRoutes } from "./routes/audit.js";
-import { licenseRoutes } from "./routes/license.js";
 import { settingsRoutes } from "./routes/settings.js";
 import { revisionRoutes } from "./routes/revisions.js";
 import { feedbackRoutes } from "./routes/feedback.js";
-import { HttpLicenseClient, currentState, type LicenseClient, type LicenseState } from "./services/license.js";
 import type { Storage } from "./services/storage.js";
 import { Queues, type Stager } from "./services/queue.js";
 import { StagingService } from "./services/staging.js";
@@ -44,8 +42,6 @@ declare module "fastify" {
     storage: Storage;
     queues: Queues;
     staging: StagingService;
-    licenseClient: LicenseClient;
-    licenseState: LicenseState;
     emailClient: EmailClient;
   }
 }
@@ -59,10 +55,6 @@ export interface AppDeps {
   stager?: Stager;
   /** Start node-cron jobs (off in tests). */
   cron?: boolean;
-  /** Override the licensing client (tests use a fake). */
-  licenseClient?: LicenseClient;
-  /** Enforce read-only mode when unlicensed (on in production, off in tests unless set). */
-  enforceLicense?: boolean;
   /** Override the outgoing-email client (tests use a fake that records messages). */
   emailClient?: EmailClient;
 }
@@ -94,8 +86,6 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     new StagingService(deps.redis, deps.db, deps.storage, deps.stager ?? queues, (jobId) => queues.enqueueRecap(jobId)),
   );
 
-  app.decorate("licenseClient", deps.licenseClient ?? new HttpLicenseClient(deps.config.LICENSE_SERVER_URL));
-  app.decorate("licenseState", { status: "unlicensed", readOnly: true } as LicenseState);
   app.decorate("emailClient", deps.emailClient ?? new EmailitClient(deps.config.EMAILIT_API_URL));
 
   await app.register(cookie);
@@ -139,22 +129,9 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   await app.register(retentionRoutes);
   await app.register(userRoutes);
   await app.register(auditRoutes);
-  await app.register(licenseRoutes);
   await app.register(settingsRoutes);
   await app.register(revisionRoutes);
   await app.register(feedbackRoutes);
-
-  // Unlicensed after grace = read-only: refuse state-changing calls except auth, setup, invites, and license entry.
-  const LICENSE_EXEMPT = /^\/api\/(auth|setup|invite|settings\/license)/;
-  app.addHook("preHandler", async (req, reply) => {
-    if (!deps.enforceLicense) return;
-    if (!["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) return;
-    if (!req.url.startsWith("/api/") || LICENSE_EXEMPT.test(req.url)) return;
-    if (app.licenseState.readOnly) {
-      reply.code(402).send({ error: "unlicensed", message: app.licenseState.message ?? "This installation is unlicensed and read-only. Enter a license key under Settings > License." });
-    }
-  });
-  Object.assign(app.licenseState, await currentState(app).catch(() => app.licenseState));
 
   const tasks = deps.cron ? startCron(app) : [];
   app.addHook("onClose", async () => {

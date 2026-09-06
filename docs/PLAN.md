@@ -44,6 +44,11 @@ also reach `api.emailit.com` to send transactional email to the firm's own users
 password-reset links, password-changed notices). Off until an admin enables it under Settings ›
 Email. The worker's egress is unchanged. Recap still never emails clients.
 
+**Amendment 2026-09-05 (Kurt, Q49):** L13's "licensed via `licensing.kisaes.com`" is withdrawn. The
+product stays under the PolyForm Small Business License but has no license key, no licensing
+server, no seat count, and no read-only mode. L12's API egress is therefore the router and
+Emailit only.
+
 ## 3. Architecture
 
 ```
@@ -149,7 +154,7 @@ Runs after `validate`, before any audio is generated, and again on every manual 
 
 | Role | Can |
 |---|---|
-| `admin` | Everything: users, settings, retention policy, branding, license, audit log, purge now |
+| `admin` | Everything: users, settings, retention policy, branding, email, audit log, purge now |
 | `preparer` | Upload, view, edit script, approve, release, download, delete own uploads within retention |
 | `staff` | Upload, view status, view video after approval, download after release |
 | `viewer` | View released videos only (e.g., front-desk or a reviewing partner who never uploads) |
@@ -181,7 +186,7 @@ Purge job: hourly; selects rows past their window; deletes the encrypted blob, s
 - `/settings/retention` — the four windows + per-client defaults
 - `/settings/users` — CRUD, roles, reset password, force logout, passkeys/TOTP status
 - `/settings/audit` — searchable audit log, CSV export
-- `/settings/license` — license key, status, seat count
+- `/settings/email` — outgoing email (Emailit), sender, public URL, test send (Q48; replaced `/settings/license`, removed per Q49)
 - `/settings/backup` — Duplicati link-out, export settings JSON, import settings JSON
 
 ## 9. Security posture summary (for the firm's WISP)
