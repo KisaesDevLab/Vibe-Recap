@@ -18,6 +18,10 @@ import { SettingsAuditPage } from "./pages/SettingsAudit";
 import { SettingsQualityPage } from "./pages/SettingsQuality";
 import { SettingsBackupPage, SettingsLicensePage } from "./pages/SettingsLicenseBackup";
 import { InvitePage } from "./pages/Invite";
+import { ForgotPasswordPage } from "./pages/ForgotPassword";
+import { ResetPasswordPage } from "./pages/ResetPassword";
+import { AccountPage } from "./pages/Account";
+import { SettingsEmailPage } from "./pages/SettingsEmail";
 import { Alert, Spinner } from "./ui";
 
 function RequireAuth({ children }: { children: ReactNode }) {
@@ -32,6 +36,8 @@ function RequireAuth({ children }: { children: ReactNode }) {
   }
   if (setupNeeded) return <Navigate to="/setup" replace />;
   if (!user) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+  // A password set by an administrator must be replaced before anything else is used.
+  if (user.mustChangePassword && location.pathname !== "/account") return <Navigate to="/account?required=1" replace />;
   return <>{children}</>;
 }
 
@@ -47,6 +53,8 @@ export function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/setup" element={<SetupPage />} />
       <Route path="/invite/:token" element={<InvitePage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
       <Route
         element={
           <RequireAuth>
@@ -55,6 +63,7 @@ export function App() {
         }
       >
         <Route index element={<DashboardPage />} />
+        <Route path="/account" element={<AccountPage />} />
         <Route
           path="/upload"
           element={
@@ -93,6 +102,7 @@ export function App() {
           <Route path="general" element={<SettingsGeneralPage />} />
           <Route path="retention" element={<SettingsRetentionPage />} />
           <Route path="users" element={<SettingsUsersPage />} />
+          <Route path="email" element={<SettingsEmailPage />} />
           <Route path="audit" element={<SettingsAuditPage />} />
           <Route path="quality" element={<SettingsQualityPage />} />
           <Route path="license" element={<SettingsLicensePage />} />

@@ -8,6 +8,8 @@ export interface UserDto {
   disabled: boolean;
   createdAt: string;
   lastLoginAt: string | null;
+  /** Set by an admin reset or a temporary password; the UI routes to /account until cleared. */
+  mustChangePassword: boolean;
 }
 
 export interface MeResponse {

@@ -7,6 +7,7 @@ import { createRedis } from "../src/services/redis.js";
 import { buildApp } from "../src/app.js";
 import { Storage } from "../src/services/storage.js";
 import type { StageResult, Stager } from "../src/services/queue.js";
+import { EmailError, type EmailClient, type OutboundEmail } from "../src/services/email.js";
 import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -34,6 +35,7 @@ export interface TestContext {
   config: Config;
   storage: Storage;
   stager: FakeStager;
+  email: FakeEmailClient;
   dataDir: string;
   close: () => Promise<void>;
 }
@@ -60,7 +62,27 @@ export async function resetDatabase(db: Db): Promise<void> {
   await runMigrations(db);
 }
 
-export async function createTestContext(overrides: Partial<Config> = {}): Promise<TestContext> {
+/** Records every outgoing message instead of calling Emailit. `fail` makes the next sends throw. */
+export class FakeEmailClient implements EmailClient {
+  sent: OutboundEmail[] = [];
+  fail: string | null = null;
+  async send(msg: OutboundEmail) {
+    if (this.fail) throw new EmailError(this.fail, 401);
+    this.sent.push(msg);
+    return { id: `em_test_${this.sent.length}` };
+  }
+  last() {
+    return this.sent[this.sent.length - 1];
+  }
+  /** First absolute http(s) link found in the plain-text body of the last message. */
+  lastLink(): string {
+    const m = /https?:\/\/\S+/.exec(this.last()?.text ?? "");
+    if (!m) throw new Error("no link in last email");
+    return m[0];
+  }
+}
+
+export async function createTestContext(overrides: Partial<Config> = {}, deps: { emailClient?: EmailClient } = {}): Promise<TestContext> {
   const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "recap-data-"));
   const config: Config = {
     ...loadConfig({}),
@@ -79,7 +101,8 @@ export async function createTestContext(overrides: Partial<Config> = {}): Promis
   const storage = new Storage(dataDir);
   await storage.init();
   const stager = new FakeStager(storage);
-  const app = await buildApp({ config, db, redis, storage, stager });
+  const email = (deps.emailClient as FakeEmailClient | undefined) ?? new FakeEmailClient();
+  const app = await buildApp({ config, db, redis, storage, stager, emailClient: email });
   await app.ready();
   return {
     app,
@@ -87,6 +110,7 @@ export async function createTestContext(overrides: Partial<Config> = {}): Promis
     config,
     storage,
     stager,
+    email,
     dataDir,
     close: async () => {
       await app.close();

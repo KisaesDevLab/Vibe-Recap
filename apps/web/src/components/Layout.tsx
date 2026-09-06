@@ -38,9 +38,9 @@ export function Layout() {
             </nav>
           </div>
           <div className="flex items-center gap-3 text-sm">
-            <span className="text-slate-600">
+            <NavLink to="/account" className={({ isActive }) => cx("rounded-md px-2 py-1 text-slate-600 hover:text-slate-900", isActive && "bg-slate-100 text-slate-900")} title="Your account">
               {user?.name} <span className="text-slate-400">({user?.role})</span>
-            </span>
+            </NavLink>
             <Button
               variant="ghost"
               size="sm"

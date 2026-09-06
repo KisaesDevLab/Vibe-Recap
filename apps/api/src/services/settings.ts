@@ -25,7 +25,17 @@ export const SETTING_DEFAULTS = {
   retention_video_days: 90,
   retention_failed_days: 7,
   license_key: "" as string,
+  // Outgoing email (Q48): transactional mail to firm users only (invites, password resets), never to clients.
+  email_provider: "none" as "none" | "emailit",
+  emailit_api_key: "" as string, // empty = use EMAILIT_API_KEY env
+  email_from: "" as string, // verified sender address on the Emailit domain
+  email_from_name: "" as string, // display name; blank = firm name
+  email_reply_to: "" as string,
+  public_url: "" as string, // empty = PUBLIC_URL env, then ALLOWED_ORIGIN, then the request's origin
 };
+
+/** Settings that never leave the box in an export and are never imported. */
+export const SECRET_SETTING_KEYS = ["license_key", "emailit_api_key"] as const satisfies readonly SettingKey[];
 
 export type SettingKey = keyof typeof SETTING_DEFAULTS;
 export type SettingsMap = { [K in SettingKey]: (typeof SETTING_DEFAULTS)[K] };

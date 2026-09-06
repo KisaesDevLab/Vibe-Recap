@@ -33,6 +33,7 @@ import type { Storage } from "./services/storage.js";
 import { Queues, type Stager } from "./services/queue.js";
 import { StagingService } from "./services/staging.js";
 import { startCron } from "./services/cron.js";
+import { EmailitClient, type EmailClient } from "./services/email.js";
 
 declare module "fastify" {
   interface FastifyInstance {
@@ -45,6 +46,7 @@ declare module "fastify" {
     staging: StagingService;
     licenseClient: LicenseClient;
     licenseState: LicenseState;
+    emailClient: EmailClient;
   }
 }
 
@@ -61,6 +63,8 @@ export interface AppDeps {
   licenseClient?: LicenseClient;
   /** Enforce read-only mode when unlicensed (on in production, off in tests unless set). */
   enforceLicense?: boolean;
+  /** Override the outgoing-email client (tests use a fake that records messages). */
+  emailClient?: EmailClient;
 }
 
 export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
@@ -92,6 +96,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
 
   app.decorate("licenseClient", deps.licenseClient ?? new HttpLicenseClient(deps.config.LICENSE_SERVER_URL));
   app.decorate("licenseState", { status: "unlicensed", readOnly: true } as LicenseState);
+  app.decorate("emailClient", deps.emailClient ?? new EmailitClient(deps.config.EMAILIT_API_URL));
 
   await app.register(cookie);
   await app.register(multipart, { limits: { fileSize: 2 * 1024 * 1024 * 1024, files: 200, fields: 10 } });

@@ -34,6 +34,9 @@ upload → identify → extract → recon gate → script (local LLM) → valida
   verification. Delivery is download only: MP4, captions, transcript, or one ZIP.
 - **Retention is a job, not a promise.** An hourly purge is the only thing that deletes files, and
   every deletion is in the audit log.
+- **Accounts stay local.** Local passwords (Argon2id), each user changes their own from the
+  account page, and an optional Emailit hookup sends invites and password-reset links to firm
+  users. Clients are never emailed.
 
 ![Job review](docs/screenshots/job.png)
 

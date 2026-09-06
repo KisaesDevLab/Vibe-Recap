@@ -70,6 +70,14 @@ total tax (verifier now feeds back into the retry loop), and the "tax year exact
   revision applied in one attempt, re-verified (39 items, 0 flagged), re-narrated and re-muxed,
   and the job returned to needs_review with a new script hash.
 
+- Accounts (Q48, 2026-09-05): `/account` change-password page for every role with a forced visit
+  while `must_change_password` is set; self-service password reset by email (hashed one-hour
+  tokens in Redis, single use, every session ended); admin *Email reset link*; invites emailed
+  when email is on. Outgoing email is Emailit's v2 API from the API container (`services/email.ts`,
+  fake client in tests), configured under Settings › Email with the key masked and kept out of
+  exports. 16 new API tests. Not yet exercised against the real Emailit service: needs a key and
+  a verified sending domain from Kurt.
+
 ## Deviations from the plan
 
 - Phase 2: the "kill the worker mid-job, the rest continue" test is deferred to Phase 3 where the

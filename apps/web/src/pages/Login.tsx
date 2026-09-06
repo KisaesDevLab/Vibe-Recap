@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
-import { Navigate, useNavigate } from "react-router";
+import { Link, Navigate, useLocation, useNavigate } from "react-router";
+import { useApi } from "../lib/useApi";
 import { useAuth } from "../lib/auth";
 import { ApiError } from "../lib/api";
 import { Alert, Button, Field, Input } from "../ui";
@@ -7,6 +8,9 @@ import { Alert, Button, Field, Input } from "../ui";
 export function LoginPage() {
   const { user, login, setupNeeded } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const notice = (location.state as { notice?: string } | null)?.notice ?? null;
+  const { data: reset } = useApi<{ enabled: boolean }>("/api/auth/password-reset/status");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -36,6 +40,7 @@ export function LoginPage() {
           <h1 className="text-lg font-bold text-brand">Vibe Recap</h1>
           <p className="text-sm text-slate-500">Sign in to continue</p>
         </div>
+        {notice && !error && <Alert kind="success">{notice}</Alert>}
         {error && <Alert kind="error">{error}</Alert>}
         <Field label="Email">
           <Input type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus />
@@ -46,6 +51,13 @@ export function LoginPage() {
         <Button type="submit" disabled={busy} className="w-full">
           {busy ? "Signing in..." : "Sign in"}
         </Button>
+        {reset?.enabled && (
+          <p className="text-center text-sm">
+            <Link to="/forgot-password" className="text-brand hover:underline">
+              Forgot your password?
+            </Link>
+          </p>
+        )}
       </form>
     </div>
   );

@@ -8,7 +8,10 @@ import { destroyUserSessions, newToken } from "../auth/session.js";
 import { badRequest, conflict, notFound } from "../errors.js";
 import { actorOf, requireRole } from "../plugins/auth.js";
 import { audit } from "../services/audit.js";
-import { toUserDto } from "./auth.js";
+import { issueResetLink, toUserDto } from "./auth.js";
+import { emailEnabled, publicUrl, trySendEmail } from "../services/email.js";
+import { inviteEmail } from "../services/email-templates.js";
+import { getSetting } from "../services/settings.js";
 
 const INVITE_TTL_S = 24 * 3600;
 
@@ -18,6 +21,8 @@ const createBody = z.object({
   role: z.enum(ROLES),
   /** Either a temporary password (user must change it) or an invite link. */
   tempPassword: z.string().max(512).optional(),
+  /** Email the invite link to the new user when outgoing email is configured (default true). */
+  sendEmail: z.boolean().optional(),
 });
 
 async function adminCount(app: FastifyInstance, excludeId?: string): Promise<number> {
@@ -48,6 +53,8 @@ export async function userRoutes(app: FastifyInstance) {
     const existing = await app.db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1);
     if (existing[0]) throw conflict("A user with that email already exists");
     let inviteUrl: string | null = null;
+    let emailed = false;
+    let emailError: string | null = null;
     let passwordHash: string;
     if (body.tempPassword) {
       const reason = checkPasswordPolicy(body.tempPassword);
@@ -64,10 +71,32 @@ export async function userRoutes(app: FastifyInstance) {
       const token = newToken(32);
       await app.redis.set(`invite:${token}`, JSON.stringify({ userId: u!.id }), "EX", INVITE_TTL_S);
       inviteUrl = `/invite/${token}`;
+      if (body.sendEmail !== false && (await emailEnabled(app))) {
+        const firmName = await getSetting(app.db, "firm_name");
+        const r = await trySendEmail(app, email, "invite", inviteEmail({ firmName, url: `${await publicUrl(app, req)}${inviteUrl}`, name: body.name, role: body.role, ttlHours: INVITE_TTL_S / 3600 }));
+        emailed = r.sent;
+        emailError = r.error;
+      }
     }
-    await audit(app.db, { actor: actorOf(req), action: "user.create", target: { type: "user", id: u!.id }, ip: req.ip, meta: { role: body.role, via: inviteUrl ? "invite" : "temp_password" } });
+    await audit(app.db, { actor: actorOf(req), action: "user.create", target: { type: "user", id: u!.id }, ip: req.ip, meta: { role: body.role, via: inviteUrl ? "invite" : "temp_password", emailed } });
     reply.code(201);
-    return { user: toUserDto(u!), inviteUrl };
+    return { user: toUserDto(u!), inviteUrl, emailed, emailError };
+  });
+
+  /** Admin: email the user a one-hour reset link instead of handing over a temporary password (Q48). */
+  app.post("/api/users/:id/send-reset-link", { preHandler: requireRole("admin") }, async (req) => {
+    const { id } = req.params as { id: string };
+    const [u] = await app.db.select().from(users).where(eq(users.id, id)).limit(1);
+    if (!u) throw notFound("User not found");
+    if (u.disabled) throw badRequest("The user is disabled; enable the account first");
+    if (!(await emailEnabled(app))) throw badRequest("Outgoing email is not configured (Settings > Email)");
+    try {
+      await issueResetLink(app, u, req);
+    } catch (err) {
+      throw badRequest(`Could not send the reset link: ${(err as Error).message}`);
+    }
+    await audit(app.db, { actor: actorOf(req), action: "user.password_reset_link_sent", target: { type: "user", id }, ip: req.ip });
+    return { ok: true };
   });
 
   app.patch("/api/users/:id", { preHandler: requireRole("admin") }, async (req) => {

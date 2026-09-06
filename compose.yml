@@ -4,7 +4,7 @@
 # Networks:
 #   frontend  caddy <-> web/api
 #   backend   internal only (no internet): api, worker, postgres, redis, ollama
-#   egress    internet access: caddy (ACME), api (licensing.kisaes.com only), ollama (model pulls)
+#   egress    internet access: caddy (ACME), api (licensing.kisaes.com; api.emailit.com when outgoing email is on), ollama (model pulls)
 # The worker is attached to `backend` only, so it has no route to the internet.
 
 x-logging: &default-logging
@@ -62,6 +62,9 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-info}
       COOKIE_SECURE: ${COOKIE_SECURE:-true}
       TRUST_PROXY: "true"
+      # Outgoing email (Q48): optional; Settings > Email can also hold the key.
+      EMAILIT_API_KEY: ${EMAILIT_API_KEY:-}
+      PUBLIC_URL: ${PUBLIC_URL:-}
     volumes:
       - ${RECAP_DATA:-./data}:/data
     networks: [frontend, backend, egress, vibe_net]

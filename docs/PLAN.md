@@ -39,6 +39,11 @@ serving DigitalOcean serverless open-source models under the router's data-bound
 bundled Ollama stays available as the local provider. The worker's egress is the router and Ollama,
 nothing else. See QUESTIONS.md Q37.
 
+**Amendment 2026-09-05 (Kurt, Q48):** L12 is amended again for the API container only: it may
+also reach `api.emailit.com` to send transactional email to the firm's own users (invites,
+password-reset links, password-changed notices). Off until an admin enables it under Settings ›
+Email. The worker's egress is unchanged. Recap still never emails clients.
+
 ## 3. Architecture
 
 ```
@@ -185,4 +190,4 @@ Data at rest encrypted (age, per-file keys). Data in transit TLS via Caddy. No t
 
 ## 10. Out of scope for v1
 
-Business returns; client portal or share links; Vibe Connect / T&B or any other integration; e-signature; multi-firm tenancy; email sending (the app never emails clients; preparers download and send the file themselves); avatar or generative video; mobile app.
+Business returns; client portal or share links; Vibe Connect / T&B or any other integration; e-signature; multi-firm tenancy; email to clients (the app never emails clients; preparers download and send the file themselves; since 2026-09-05 it does email firm users invites and password-reset links through Emailit, QUESTIONS.md Q48); avatar or generative video; mobile app.

@@ -34,6 +34,11 @@ const schema = z.object({
   MIGRATIONS_AUTO: bool.default(true),
   /** Comma-separated list of allowed Origin values for state-changing requests; empty = same-origin only. */
   ALLOWED_ORIGIN: z.string().default(""),
+  /** Outgoing email (Q48): Emailit API key. Settings > Email can override it; empty here and there = no email. */
+  EMAILIT_API_KEY: z.string().default(""),
+  EMAILIT_API_URL: z.string().default("https://api.emailit.com"),
+  /** Public URL of this install for links in emails, e.g. https://recap.yourfirm.com. Falls back to ALLOWED_ORIGIN, then the request. */
+  PUBLIC_URL: z.string().default(""),
 });
 
 export type Config = z.infer<typeof schema>;

@@ -100,6 +100,7 @@ Settings > General: firm name, logo, colors, sign-off sentence, narration voice.
 Settings > Retention: how long source PDFs, scripts, and videos stay. Defaults 30 / 365 / 90 days.
 Settings > License: paste the key from your Kisaes order. Without it the app is read-only.
 Settings > Users: add preparers and staff; invite links are valid for 24 hours.
+Settings > Email: optional outgoing email so invites and password resets arrive by email (section 6c).
 
 ## 6a. Vibe AI Router (default script provider)
 
@@ -119,6 +120,26 @@ preparer's note are sent; the return PDF never leaves the box.
 4. Settings > General > *Test connections* shows the router state and the class's sensitivity.
 
 Without a token, or with *Bundled Ollama* selected, scripts are generated locally by `qwen3:8b`.
+
+## 6c. Outgoing email (optional)
+
+Without email, an administrator hands new users an invite link and resets a forgotten password
+by setting a temporary one under Settings > Users. With email on, invites and one-hour reset
+links are sent to the user, the sign-in page gains *Forgot your password?*, and every password
+change sends the account a notice. Recap emails firm users only, never clients, and never
+attaches anything from a return.
+
+1. Create an account at [emailit.com](https://emailit.com), verify your sending domain, and
+   create an API key limited to that domain (Settings > API keys).
+2. In Recap, Settings > Email: provider *Emailit*, paste the key, set the sender address on the
+   verified domain (for example `recap@yourfirm.com`), optionally a sender name and reply-to.
+   The key can also come from `EMAILIT_API_KEY` in `.env`.
+3. Set *Public URL* to the address your users open Recap at if it differs from the address the
+   server sees (behind a reverse proxy or a Tailscale name). Blank works for most installs.
+4. Save, then *Send test message*. The key is stored on this box, shown masked, and is not part of
+   the settings export.
+
+Every user can change their own password at any time from their name in the top-right corner.
 
 ## 6b. Installing on the Vibe Appliance
 
@@ -177,6 +198,9 @@ Keep a separate offline copy of `data/keys/master.key`. Without it the blobs can
 | "worker restarted mid-job" on a job | The worker was restarted while processing. Click *Retry*; it resumes at that step. |
 | Upload says "PDF is password-protected" | Remove the password in the tax software's print dialog and upload again. |
 | Everything is read-only | Settings > License: the key is missing, rejected, or the licensing server has been unreachable for more than 14 days. |
+| *Forgot your password?* is missing from the sign-in page | Outgoing email is off. An admin turns it on under Settings > Email (section 6c) or resets the password with a temporary one under Settings > Users. |
+| Reset or invite emails do not arrive | Settings > Email > *Send test message* shows Emailit's answer. Common causes: the sender address is not on a verified Emailit domain, the key is limited to another domain, or the message is in spam. Failed sends are in the audit log as `auth.password_reset_email_failed`. |
+| Links in emails point at the wrong host | Set *Public URL* under Settings > Email (or `PUBLIC_URL` in `.env`). |
 | Changing *Concurrency* had no effect | `docker compose restart worker`. |
 
 Logs: `docker compose logs -f api worker`. Logs contain job ids and hashes, never names or amounts.

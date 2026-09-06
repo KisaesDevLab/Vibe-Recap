@@ -6,8 +6,10 @@ import { actorOf, requireRole } from "../plugins/auth.js";
 import { audit } from "../services/audit.js";
 import { ollamaStatus } from "../services/ollama.js";
 import { registerTaskClasses } from "../services/airouter.js";
-import { getAllSettings, SETTING_DEFAULTS, setSetting, type SettingKey } from "../services/settings.js";
+import { getAllSettings, SECRET_SETTING_KEYS, SETTING_DEFAULTS, setSetting, type SettingKey } from "../services/settings.js";
 import { badRequest } from "../errors.js";
+import { emailConfig, isEmailAddress, publicUrl, sendEmail } from "../services/email.js";
+import { testEmail } from "../services/email-templates.js";
 
 const GENERAL_KEYS = [
   "firm_name",
@@ -103,10 +105,83 @@ export async function settingsRoutes(app: FastifyInstance) {
     };
   });
 
+  // ---- Outgoing email (Q48) ----------------------------------------------------------------
+
+  const emailKeys = ["email_provider", "email_from", "email_from_name", "email_reply_to", "public_url"] as const satisfies readonly SettingKey[];
+  const emailBody = z.object({
+    email_provider: z.enum(["none", "emailit"]).optional(),
+    /** Omit to keep the stored key; empty string clears it. */
+    emailit_api_key: z.string().max(300).optional(),
+    email_from: z.string().max(200).optional(),
+    email_from_name: z.string().max(120).optional(),
+    email_reply_to: z.string().max(200).optional(),
+    public_url: z.string().max(200).optional(),
+  });
+
+  async function emailView() {
+    const s = await getAllSettings(app.db);
+    const cfg = await emailConfig(app);
+    return {
+      settings: Object.fromEntries(emailKeys.map((k) => [k, s[k]])),
+      apiKeySet: cfg.apiKeySet,
+      apiKeySource: cfg.apiKeySource,
+      apiKeyMasked: s.emailit_api_key ? `${s.emailit_api_key.slice(0, 6)}…${s.emailit_api_key.slice(-4)}` : null,
+      enabled: cfg.enabled,
+      reason: cfg.reason,
+      effectiveFromName: cfg.fromName,
+      effectivePublicUrl: await publicUrl(app),
+    };
+  }
+
+  app.get("/api/settings/email", { preHandler: requireRole("admin") }, async () => emailView());
+
+  app.put("/api/settings/email", { preHandler: requireRole("admin") }, async (req) => {
+    const body = emailBody.parse(req.body);
+    for (const k of ["email_from", "email_reply_to"] as const) {
+      const v = body[k]?.trim();
+      if (v && !isEmailAddress(v)) throw badRequest(`${k === "email_from" ? "Sender" : "Reply-to"} must be a plain email address`);
+    }
+    if (body.public_url?.trim() && !/^https?:\/\/[^/\s]+$/i.test(body.public_url.trim().replace(/\/+$/, ""))) throw badRequest("Public URL must look like https://recap.yourfirm.com (no path)");
+    const user = req.auth!.user;
+    const changed: string[] = [];
+    for (const k of emailKeys) {
+      const v = body[k];
+      if (v === undefined) continue;
+      const clean = k === "public_url" ? v.trim().replace(/\/+$/, "") : v.trim();
+      await setSetting(app.db, k, clean as never, user.id);
+      changed.push(k);
+    }
+    if (body.emailit_api_key !== undefined) {
+      await setSetting(app.db, "emailit_api_key", body.emailit_api_key.trim(), user.id);
+      changed.push(body.emailit_api_key.trim() ? "emailit_api_key" : "emailit_api_key:cleared");
+    }
+    await audit(app.db, { actor: actorOf(req), action: "settings.update", target: { type: "settings", id: "email" }, ip: req.ip, meta: { keys: changed } });
+    return emailView();
+  });
+
+  /** Send a test message to the signed-in admin (or a given address) with the saved configuration. */
+  app.post("/api/settings/email/test", { preHandler: requireRole("admin") }, async (req) => {
+    const body = z.object({ to: z.string().max(200).optional() }).parse(req.body ?? {});
+    const user = req.auth!.user;
+    const to = (body.to?.trim() || user.email).toLowerCase();
+    if (!isEmailAddress(to)) throw badRequest("Recipient must be an email address");
+    const cfg = await emailConfig(app);
+    if (!cfg.enabled) throw badRequest(cfg.reason ? `Outgoing email is not available: ${cfg.reason.toLowerCase()}` : "Outgoing email is not configured");
+    try {
+      const r = await sendEmail(app, to, "test", testEmail({ firmName: (await getAllSettings(app.db)).firm_name, url: await publicUrl(app, req), sentBy: user.name }));
+      await audit(app.db, { actor: actorOf(req), action: "settings.email_test", ip: req.ip, meta: { ok: true } });
+      return { ok: true, id: r.id };
+    } catch (err) {
+      await audit(app.db, { actor: actorOf(req), action: "settings.email_test", ip: req.ip, meta: { ok: false, error: (err as Error).message.slice(0, 200) } });
+      throw badRequest((err as Error).message);
+    }
+  });
+
   /** Export firm settings and form profiles as one JSON document (no client data, no keys). */
   app.get("/api/settings/backup/export", { preHandler: requireRole("admin") }, async (req, reply) => {
     const s = await getAllSettings(app.db);
-    const { license_key: _omit, ...settings } = s;
+    const settings: Partial<typeof s> = { ...s };
+    for (const k of SECRET_SETTING_KEYS) delete settings[k];
     const profiles: Record<string, string> = {};
     try {
       for (const name of await fs.readdir(profilesDir(app))) {
@@ -133,7 +208,7 @@ export async function settingsRoutes(app: FastifyInstance) {
     const applied: string[] = [];
     const keys = body.mode === "replace" ? (Object.keys(SETTING_DEFAULTS) as SettingKey[]) : (Object.keys(body.settings ?? {}) as SettingKey[]);
     for (const k of keys) {
-      if (!(k in SETTING_DEFAULTS) || k === "license_key") continue;
+      if (!(k in SETTING_DEFAULTS) || (SECRET_SETTING_KEYS as readonly string[]).includes(k)) continue;
       const v = body.settings && k in body.settings ? body.settings[k] : SETTING_DEFAULTS[k];
       await setSetting(app.db, k, v as never, user.id);
       applied.push(k);

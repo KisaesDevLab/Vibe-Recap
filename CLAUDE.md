@@ -60,6 +60,7 @@ The docs name these commands; they become real as each phase lands. Confirm agai
 | Single Python test | `pytest path/to/test_file.py::test_name` (pytest node-id syntax) |
 | Regenerate synthetic fixtures | `python scripts/make-fixture.py` (Phase 3) |
 | Health | `curl -k https://<host>/healthz` |
+| Outgoing email | Settings › Email (provider Emailit, key, sender) or `EMAILIT_API_KEY` in `.env`; `PUBLIC_URL` for links |
 | Use host Ollama instead of bundled | set `OLLAMA_URL` in `.env`; scale `ollama` service to 0 |
 
 ## Target hardware
@@ -108,10 +109,11 @@ Cross-cutting rules that are easy to miss:
 1a. **Every amount and fact in the script must be verified against the uploaded return itself**, not just the extraction. The verifier (`worker/recap/verify/`) does its own text pass over the source PDF and traces each amount to a page and line label, recomputes percentages and YoY deltas from what it finds, and checks tax year, filing status, names, deduction type, refund-vs-owed direction, state presence, and PII absence. It must not import from `extract`. A job cannot reach `needs_review`, and Approve is disabled, while any verification item is flagged. Spec: `docs/PLAN.md` §5a.
 2. **Arithmetic reconciliation gate.** Extracted 1040 lines must foot to the return's own totals within $1 before a script is generated. Failures surface to the preparer as an extraction problem, not a silent video.
 3. **Preparer approval before release; delivery is download only.** No share links, no portal, no Vibe Connect. A video is never downloadable until a user with `preparer` or `admin` role clicks Approve. The approve action snapshots the script and the extracted JSON.
-4. **No outbound network calls from the worker** except to the Vibe AI Router (via `airouter-proxy` on the egress-denied network; default script-generation provider since Kurt's 2026-09-05 decision, QUESTIONS.md Q37) and to Ollama (bundled container, or the host gateway when `OLLAMA_URL` points at the host). Enforce with an egress-denied network in compose plus socat relays for exactly those two targets. The API container may reach `licensing.kisaes.com` and the router only. There are no other integrations; do not add any. What leaves the box through the router is the script prompt (extracted figures, first names, filing status, states, preparer note), never the PDF; the router's task-class policy (`recap_script`) governs which provider serves it.
+4. **No outbound network calls from the worker** except to the Vibe AI Router (via `airouter-proxy` on the egress-denied network; default script-generation provider since Kurt's 2026-09-05 decision, QUESTIONS.md Q37) and to Ollama (bundled container, or the host gateway when `OLLAMA_URL` points at the host). Enforce with an egress-denied network in compose plus socat relays for exactly those two targets. The API container may reach `licensing.kisaes.com`, the router, and `api.emailit.com` (outgoing email to firm users only, off until an admin enables it; Kurt's 2026-09-05 decision, QUESTIONS.md Q48). There are no other integrations; do not add any. What leaves the box through the router is the script prompt (extracted figures, first names, filing status, states, preparer note), never the PDF; the router's task-class policy (`recap_script`) governs which provider serves it.
 5. **Retention is enforced by a job, not by trust.** The purge worker runs hourly and is the only thing that deletes files. Purges are logged to the audit table. A thumbs-down on a job (Q46) holds its files for 90 days or until an admin dismisses it; the hold moves the date, it never adds a deleter.
 6. **Extracted values are never hand-edited.** If a line is misread, the form profile is wrong. Fix the profile and re-extract. Recon failures may be downgraded to warnings per job by a preparer, with a reason, audited.
 7. **No PII in logs.** Log job IDs and file hashes, never names, SSNs, or amounts. Redact structured logs at the logger level, not by convention.
+8. **Email goes to firm users only.** Invites, password-reset links, password-changed notices, and the admin's test message; recipients are always rows in `users`. Nothing from a return, no client addresses, no attachments. The Emailit key is a secret setting: masked in the API, excluded from export and import, redacted in logs.
 
 ## Repo layout
 
@@ -167,6 +169,7 @@ Never commit a real tax return. `tests/fixtures/` contains synthetic 1040 packag
 - **Argon2id in Node** needs the native `argon2` package; alpine images need `build-base` at build time. Use the `-bookworm-slim` base.
 - **Batch staging lives in Redis, not Postgres.** Staged-but-unqueued rows expire after 1 h; do not create `jobs` rows until the preparer clicks Queue.
 - **BullMQ from Python** requires the job data shape to be plain JSON and the queue name to match exactly (`recap`).
+- **Password-reset and invite tokens live in Redis**, hashed (`pwreset:<sha256>`, 1 h) and plain (`invite:<token>`, 24 h) respectively; a new reset request revokes the previous one; `consumeResetToken` uses GETDEL so a link works once. Links are built from the `public_url` setting, then `PUBLIC_URL`, then the first `ALLOWED_ORIGIN`, then the request origin.
 
 ## Definition of done for any phase
 

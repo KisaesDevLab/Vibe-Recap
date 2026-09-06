@@ -5,6 +5,7 @@ import { ApiError, patch, post } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { fmtDate } from "../lib/format";
 import { Alert, Badge, Button, Card, Field, Input, PageTitle, Select, Spinner } from "../ui";
+import { Link } from "react-router";
 
 interface UserRow {
   id: string;
@@ -23,9 +24,11 @@ interface UserRow {
 export function SettingsUsersPage() {
   const { user: me } = useAuth();
   const { data, loading, error, reload } = useApi<{ users: UserRow[] }>("/api/users");
+  const { data: emailCfg } = useApi<{ enabled: boolean }>("/api/settings/email");
+  const emailOn = !!emailCfg?.enabled;
   const [msg, setMsg] = useState<{ kind: "error" | "success" | "info"; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
-  const [inviteUrl, setInviteUrl] = useState<string | null>(null);
+  const [inviteUrl, setInviteUrl] = useState<{ url: string; emailed: boolean; emailError: string | null } | null>(null);
 
   async function run(fn: () => Promise<void>, ok?: string) {
     setBusy(true);
@@ -47,8 +50,8 @@ export function SettingsUsersPage() {
     const fd = new FormData(form);
     const tempPassword = String(fd.get("tempPassword") || "");
     await run(async () => {
-      const r = await post<{ inviteUrl: string | null }>("/api/users", { email: fd.get("email"), name: fd.get("name"), role: fd.get("role"), tempPassword: tempPassword || undefined });
-      setInviteUrl(r.inviteUrl ? `${window.location.origin}${r.inviteUrl}` : null);
+      const r = await post<{ inviteUrl: string | null; emailed: boolean; emailError: string | null }>("/api/users", { email: fd.get("email"), name: fd.get("name"), role: fd.get("role"), tempPassword: tempPassword || undefined });
+      setInviteUrl(r.inviteUrl ? { url: `${window.location.origin}${r.inviteUrl}`, emailed: r.emailed, emailError: r.emailError } : null);
       form.reset();
     }, "User created.");
   }
@@ -66,8 +69,9 @@ export function SettingsUsersPage() {
       )}
       {inviteUrl && (
         <div className="mb-4">
-          <Alert kind="info">
-            Invite link (valid 24 hours, single use): <code className="select-all">{inviteUrl}</code>
+          <Alert kind={inviteUrl.emailError ? "warning" : "info"}>
+            {inviteUrl.emailed ? "The invite was emailed to the user. " : inviteUrl.emailError ? `The invite email could not be sent (${inviteUrl.emailError}). Hand over the link instead. ` : ""}
+            Invite link (valid 24 hours, single use): <code className="select-all">{inviteUrl.url}</code>
           </Alert>
         </div>
       )}
@@ -124,8 +128,13 @@ export function SettingsUsersPage() {
                             if (p) void run(() => post(`/api/users/${u.id}/reset-password`, { tempPassword: p }).then(() => undefined), "Password reset; the user must change it at next login.");
                           }}
                         >
-                          Reset password
+                          Set temporary password
                         </Button>
+                        {emailOn && (
+                          <Button size="sm" variant="ghost" disabled={busy || u.disabled} onClick={() => run(() => post(`/api/users/${u.id}/send-reset-link`).then(() => undefined), "A one-hour reset link was emailed to the user.")}>
+                            Email reset link
+                          </Button>
+                        )}
                         <Button size="sm" variant="ghost" disabled={busy} onClick={() => run(() => post(`/api/users/${u.id}/force-logout`).then(() => undefined), "Signed out everywhere.")}>
                           Force logout
                         </Button>
@@ -135,7 +144,15 @@ export function SettingsUsersPage() {
                 ))}
               </tbody>
             </table>
-            <p className="mt-3 text-xs text-slate-500">Passkeys and TOTP are planned for v1.1; the column shows their status once enabled. The last active admin cannot be demoted or disabled.</p>
+            <p className="mt-3 text-xs text-slate-500">
+              Passkeys and TOTP are planned for v1.1; the column shows their status once enabled. The last active admin cannot be demoted or disabled.
+              {!emailOn && (
+                <>
+                  {" "}
+                  Turn on outgoing email under <Link to="/settings/email" className="text-brand hover:underline">Settings › Email</Link> to send invites and reset links by email.
+                </>
+              )}
+            </p>
           </Card>
         </div>
         <Card title="Add user">
@@ -155,7 +172,7 @@ export function SettingsUsersPage() {
                 ))}
               </Select>
             </Field>
-            <Field label="Temporary password" hint="Leave blank to get a 24-hour invite link instead.">
+            <Field label="Temporary password" hint={emailOn ? "Leave blank to email the user a 24-hour invite link (the link is also shown here)." : "Leave blank to get a 24-hour invite link instead."}>
               <Input name="tempPassword" type="text" autoComplete="off" />
             </Field>
             <Button type="submit" disabled={busy}>

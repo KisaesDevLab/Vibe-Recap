@@ -5,6 +5,7 @@ const TABS = [
   { to: "/settings/general", label: "General" },
   { to: "/settings/retention", label: "Retention" },
   { to: "/settings/users", label: "Users" },
+  { to: "/settings/email", label: "Email" },
   { to: "/settings/audit", label: "Audit log" },
   { to: "/settings/quality", label: "Quality" },
   { to: "/settings/license", label: "License" },
