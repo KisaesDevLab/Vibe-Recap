@@ -50,6 +50,32 @@ def test_split_and_narrate_with_fake_synth():
     assert "[[slide" not in tts.to_txt(script)
 
 
+def test_speakable_moves_the_dollar_sign_after_the_number():
+    # espeak says "dollar one thousand" for "$1,000"; the narration text must say it the other way.
+    assert tts.speakable("Your refund is $1,000.") == "Your refund is 1,000 dollars."
+    assert tts.speakable("You paid $1 more.") == "You paid 1 dollar more."
+    assert tts.speakable("A $1.01 credit.") == "A 1 dollar and 1 cent credit."
+    assert tts.speakable("A $1,234.56 balance.") == "A 1,234 dollars and 56 cents balance."
+    assert tts.speakable("About $1.2 million.") == "About 1.2 million dollars."
+    assert tts.speakable("We show ($500) and -$500.") == "We show negative 500 dollars and negative 500 dollars."
+    assert tts.speakable("Your rate was 22%.") == "Your rate was 22%."  # espeak already says "percent"
+    assert tts.speakable("(see $1,200) today") == "(see 1,200 dollars) today"  # unrelated parens survive
+
+
+def test_narration_is_spoken_but_captions_keep_the_written_form():
+    script = "[[slide:greeting]]\nYour refund is $1,000.\n[[slide:next]]\nWe will talk soon.\n"
+    seen: list[str] = []
+
+    def spy(text: str):
+        seen.append(text)
+        return fake_synth(text)
+
+    n = tts.narrate(script, spy)
+    assert seen[0] == "Your refund is 1,000 dollars."
+    assert n.sentences[0].text == "Your refund is $1,000."
+    assert "$1,000" in tts.to_vtt(n.sentences)
+
+
 @pytest.mark.skipif(not (MODELS / "kokoro-v1.0.onnx").exists(), reason="Kokoro model files not present")
 def test_kokoro_synthesizes_a_sentence():
     synth = tts.kokoro_synth(str(MODELS), "af_heart")

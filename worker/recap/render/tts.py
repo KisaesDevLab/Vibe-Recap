@@ -28,6 +28,32 @@ SENTENCE_RE = re.compile(r"(?<=[.!?])\s+")
 TAG_RE = re.compile(r"\[\[slide:([a-z_]+)\]\]")
 GAP_S = 0.35  # silence appended after each sentence
 
+# espeak (inside Kokoro's phonemizer) reads "$1,000" as "dollar one thousand": it speaks the
+# symbol where it stands instead of moving it after the number. Rewrite money into words before
+# synthesis. Only the audio is rewritten; captions and the transcript keep the written form.
+# The paren group is a conditional: the closing ")" is only consumed when the match opened one.
+MONEY_RE = re.compile(
+    r"(?P<paren>\()?(?P<neg>-)?\$\s?(?P<num>\d{1,3}(?:,\d{3})+|\d+)(?:\.(?P<cents>\d{1,2}))?"
+    r"(?P<scale>\s+(?:thousand|million|billion))?(?(paren)\))"
+)
+
+
+def speakable(text: str) -> str:
+    """Narration form of a sentence: '$1,000' -> '1,000 dollars', '($1)' -> 'negative 1 dollar'."""
+
+    def repl(m: re.Match[str]) -> str:
+        num, cents, scale = m.group("num"), m.group("cents"), (m.group("scale") or "").strip()
+        c = int(cents.ljust(2, "0")) if cents else 0
+        if scale:
+            said = f"{num}.{cents} {scale} dollars" if cents else f"{num} {scale} dollars"
+        elif c:
+            said = f"{num} {'dollar' if num == '1' else 'dollars'} and {c} {'cent' if c == 1 else 'cents'}"
+        else:
+            said = f"{num} {'dollar' if num == '1' else 'dollars'}"
+        return ("negative " if m.group("neg") or m.group("paren") else "") + said
+
+    return MONEY_RE.sub(repl, text)
+
 
 @dataclass
 class Sentence:
@@ -101,7 +127,7 @@ def narrate(script: str, synth: Synth) -> Narration:
     sr_seen: int | None = None
     t = 0.0
     for i, (slide, text) in enumerate(pieces):
-        samples, sr = synth(text)
+        samples, sr = synth(speakable(text))
         sr_seen = sr_seen or sr
         if sr != sr_seen:
             raise ValueError("sample rate changed mid-narration")
