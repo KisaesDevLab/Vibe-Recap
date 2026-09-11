@@ -2,7 +2,7 @@
 
 ## 1. Purpose
 
-Give tax clients a two-to-three minute narrated video that explains their return in plain English: what they earned, what they paid, why the refund or balance due is what it is, and what to talk about at the review meeting. Preparers upload the finished return package, review the generated script, approve, and send. The firm keeps every byte on its own hardware.
+Give tax clients a two-to-three minute narrated video that explains their return in plain English: what they earned, what they paid, why the refund or balance due is what it is. It accompanies the delivered return: the recap closes by telling the client their complete copy is on its way and to contact the firm with any questions (amended 2026-09-11, QUESTIONS.md Q50). Preparers upload the finished return package, review the generated script, approve, and send. The firm keeps every byte on its own hardware.
 
 Positioning inside the Vibe suite: a **standalone appliance** with its own UI, users, storage, and retention rules. It does not require any other Vibe product. Delivery is download only: the preparer downloads the approved video and sends it through whatever channel the firm already uses. No portal, no share links, no integrations in v1.
 
@@ -27,7 +27,7 @@ Positioning inside the Vibe suite: a **standalone appliance** with its own UI, u
 | L16 | Recon gate exceptions: a `preparer` may downgrade a named check to a warning with a written reason; audited; the job proceeds. The downgrade is per job, never global. | Q10. |
 | L17 | One firm per install. No multi-tenancy. | Q7. |
 | L18 | Greeting uses first name(s) only, from the return; setting to disable. | Q5. |
-| L19 | Four bundled Kokoro voices; firm picks one in settings. | Q3. |
+| L19 | Four bundled Kokoro voices. The firm picks a default in settings; each user may pick their own under Your account, and the recaps they upload are narrated in it (amended 2026-09-11, QUESTIONS.md Q51). | Q3. |
 | L20 | All states in the package are summarized; resident state in detail, others by result only. | Q9. |
 | L21 | Source PDF default retention 30 days. | Q6. |
 | L22 | Batch upload: many PDFs (or a ZIP of PDFs) in one action; each PDF becomes its own independent job. Client is auto-matched from the taxpayer name on the return and confirmed by the preparer before the batch is queued. Jobs process serially; one failure never blocks the others. | Kurt 2026-09-03. |
@@ -182,7 +182,8 @@ Purge job: hourly; selects rows past their window; deletes the encrypted blob, s
 - `/batches/:id` — Batch detail: progress bar, per-job status/step, failed jobs with reason and "Retry" (re-enqueue from the failed step), "Approve all verified" (approves every job in `needs_review` whose verification has zero flags — each approval still audited individually), "Download all released" as one ZIP of per-client ZIPs.
 - `/jobs/:id` — Job detail: status timeline, extraction table (read-only; "Re-extract" button; recon checks with per-check downgrade-to-warning for preparers), script editor with validator + verification panel, video preview, approve / reject / release, download (MP4, VTT, TXT, extraction JSON)
 - `/clients` — client list, per-client jobs, retention override, legal hold
-- `/settings/general` — firm name, logo, colors, voice, model name, concurrency, Ollama URL
+- `/settings/general` — firm name, logo, colors, default voice, model name, concurrency, Ollama URL
+- `/account` — every role: change password, and the narration voice used for the recaps this user uploads
 - `/settings/retention` — the four windows + per-client defaults
 - `/settings/users` — CRUD, roles, reset password, force logout, passkeys/TOTP status
 - `/settings/audit` — searchable audit log, CSV export

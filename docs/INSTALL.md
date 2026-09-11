@@ -96,7 +96,8 @@ Passwords need 12 characters or more and cannot be one of the 100,000 most commo
 
 ## 6. Settings to review before the first return
 
-Settings > General: firm name, logo, colors, sign-off sentence, narration voice.
+Settings > General: firm name, logo, colors, sign-off sentence, default narration voice. Each user can
+choose their own narration voice under Your account; it overrides the default for the recaps they upload.
 Settings > Retention: how long source PDFs, scripts, and videos stay. Defaults 30 / 365 / 90 days.
 Settings > Users: add preparers and staff; invite links are valid for 24 hours.
 Settings > Email: optional outgoing email so invites and password resets arrive by email (section 6c).

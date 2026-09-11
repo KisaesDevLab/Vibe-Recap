@@ -165,6 +165,11 @@ Never commit a real tax return. `tests/fixtures/` contains synthetic 1040 packag
 - **Real returns for testing** live in `tests/fixtures/real/` (gitignored). Never commit one; never print names or amounts from them into chat, logs, or commits.
 - **Playwright in Docker** needs `--no-sandbox` and `shm_size: 1g` or Chromium will crash on the second render.
 - **ffmpeg concat with per-image durations** requires the `-f concat` demuxer with a durations file; the last image must be listed twice or it is dropped.
+- **espeak speaks "$" where it stands.** Kokoro's phonemizer reads "$1,000" as "dollar one thousand".
+  `tts.speakable()` rewrites money into words right before synthesis; captions, the transcript, the
+  validator and the verifier keep the written `$1,000`. Never normalize the stored script itself.
+- **Narration voice is per user, then per firm.** `users.voice` (set at Your account) wins over the
+  `voice` setting; `tts.resolve_voice()` is the one place that decides.
 - **Kokoro sentence timing.** Generate per-sentence WAVs and record durations; drive slide transitions from those durations, not from word counts.
 - **Argon2id in Node** needs the native `argon2` package; alpine images need `build-base` at build time. Use the `-bookworm-slim` base.
 - **Batch staging lives in Redis, not Postgres.** Staged-but-unqueued rows expire after 1 h; do not create `jobs` rows until the preparer clicks Queue.

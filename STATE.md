@@ -78,6 +78,24 @@ total tax (verifier now feeds back into the retry loop), and the "tax year exact
   exports. 16 new API tests. Not yet exercised against the real Emailit service: needs a key and
   a verified sending domain from Kurt.
 
+## Narration and delivery wording (2026-09-11)
+
+- Spoken money (Q52): Kokoro's phonemizer says "dollar one thousand" for "$1,000". `tts.speakable()`
+  rewrites amounts into words immediately before synthesis ("1,000 dollars", "1 dollar",
+  "1,234 dollars and 56 cents", "1.2 million dollars", "negative 500 dollars"). It touches only the
+  audio: the captions, the transcript, the validator, and the verifier all still see the written
+  `$1,000`. Percentages already spoke correctly. Covered by `test_render.py`.
+- Closing section (Q50): the recap is delivered *with* the finished return, not ahead of a review
+  meeting. Prompt rule 9 now forbids mentioning a meeting, an appointment, payment options, or
+  anything the client must do, and asks for "your complete copy is on its way; contact us with any
+  questions"; the voice rule and the default sign-off sentence changed to match, as did the next
+  slide's heading and the three golden scripts. `test_verify.py` anchored its injected-PII strings
+  on the new closing text.
+- Per-user voice (Q51): `users.voice` (migration `0005_user_voice`), set at *Your account*
+  (`PUT /api/auth/preferences`, returned on `/api/auth/me`, `VOICES` moved to `packages/shared`).
+  The worker resolves uploader's choice -> firm setting -> `af_heart` in `tts.resolve_voice()` at the
+  `tts` step, so re-rendering picks up a changed preference. Settings › General sets the firm default.
+
 ## Deviations from the plan
 
 - Phase 2: the "kill the worker mid-job, the rest continue" test is deferred to Phase 3 where the
