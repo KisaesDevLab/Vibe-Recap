@@ -101,6 +101,9 @@ total tax (verifier now feeds back into the retry loop), and the "tax year exact
 ## Releases
 
 - v0.1.0 (2026-09-05): first release, all nine phases.
+- v0.3.0 (2026-09-11): purge a single job from its own page (Q53); re-render one job in another
+  voice, 16 English Kokoro voices instead of 4, and a warning when a video is older than the script
+  beside it (Q54-Q56).
 - v0.2.1 (2026-09-11): narration spells out decimals ("11 point 7%"); espeak had been reading
   "11.7%" at the end of a sentence as "eleven. seven percent" (Q52).
 - v0.2.0 (2026-09-11): everything after the first release — UltraTax-only staging and feedback
