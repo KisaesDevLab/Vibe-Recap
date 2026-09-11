@@ -99,6 +99,10 @@ Passwords need 12 characters or more and cannot be one of the 100,000 most commo
 Settings > General: firm name, logo, colors, sign-off sentence, default narration voice. Each user can
 choose their own narration voice under Your account; it overrides the default for the recaps they upload.
 Settings > Retention: how long source PDFs, scripts, and videos stay. Defaults 30 / 365 / 90 days.
+An admin can also purge ahead of the schedule: everything due (Settings > Retention), every job of one
+client (the client page), or a single job ("Purge this job now" on the job page, confirmed by typing the
+job id). All of them run the same purge code, log one audit row per file, and are refused while the
+client is on legal hold, the job is still processing, or a thumbs-down holds the job.
 Settings > Users: add preparers and staff; invite links are valid for 24 hours.
 Settings > Email: optional outgoing email so invites and password resets arrive by email (section 6c).
 

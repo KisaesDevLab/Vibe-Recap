@@ -13,7 +13,7 @@ import { VideoPanel } from "../components/VideoPanel";
 import { RevisionPanel } from "../components/RevisionPanel";
 import { FeedbackPanel } from "../components/FeedbackPanel";
 import type { ExtractionResponse } from "@vibe-recap/shared";
-import { Alert, Button, Card, PageTitle, Spinner } from "../ui";
+import { Alert, Button, Card, Input, PageTitle, Spinner } from "../ui";
 
 export function JobPage() {
   const { id } = useParams();
@@ -125,6 +125,28 @@ export function JobPage() {
               )}
             </dl>
           </Card>
+          {can("admin") && job.status !== "purged" && (
+            <Card title="Purge this job now">
+              <p className="mb-2 text-xs text-slate-500">
+                Shreds every file of this job immediately and logs each one. The client's other jobs are untouched. Type the job id
+                (<span className="font-mono">{job.id.slice(0, 8)}</span>) to confirm. Refused while the job is processing, the client is on legal
+                hold, or a thumbs-down holds the job.
+              </p>
+              <form
+                className="flex gap-2"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const fd = new FormData(e.currentTarget);
+                  void act(`/api/jobs/${job.id}/purge-now`, { confirmJobId: fd.get("confirmJobId") });
+                }}
+              >
+                <Input name="confirmJobId" placeholder={job.id.slice(0, 8)} required />
+                <Button type="submit" variant="danger" disabled={busy}>
+                  Purge
+                </Button>
+              </form>
+            </Card>
+          )}
           <Card title="Files">
             <ul className="space-y-1 text-sm">
               {job.files.map((f) => (

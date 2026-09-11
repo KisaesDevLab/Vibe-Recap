@@ -108,6 +108,15 @@ total tax (verifier now feeds back into the retry loop), and the "tax year exact
   licensing removed (Q49), the delivery-note close (Q50), per-user narration voices (Q51), and
   money spoken as "1,000 dollars" (Q52).
 
+## Per-job purge (2026-09-11)
+
+- Q53: `POST /api/jobs/:id/purge-now` (admin, types the job's short id) and a danger card on the job
+  page. `collectCandidates()` takes a `{ clientId, jobId, everything }` scope now, so the single-job
+  purge is the same `runPurge()` code as the hourly run — one `file.purge` audit row per file plus a
+  `job.purge_now` row, the job flips to `purged`, sibling jobs are untouched. Refused on an already
+  purged job, a queued/processing job, a client on legal hold, or a job held by a thumbs-down.
+  Covered by two tests in `retention.integration.test.ts`.
+
 ## Deviations from the plan
 
 - Phase 2: the "kill the worker mid-job, the rest continue" test is deferred to Phase 3 where the

@@ -84,13 +84,18 @@ export function dueFiles(job: Job, client: Client, jobFiles: FileRow[], windows:
   return out;
 }
 
-export async function collectCandidates(app: FastifyInstance, now: Date, clientId?: string, everything = false): Promise<{ candidates: PurgeCandidate[]; skippedLegalHold: number; skippedFeedbackHold: number }> {
+export async function collectCandidates(
+  app: FastifyInstance,
+  now: Date,
+  scope: { clientId?: string; jobId?: string; everything?: boolean } = {},
+): Promise<{ candidates: PurgeCandidate[]; skippedLegalHold: number; skippedFeedbackHold: number }> {
+  const { clientId, jobId, everything = false } = scope;
   const settings = await getAllSettings(app.db);
   const rows = await app.db
     .select({ job: jobs, client: clients })
     .from(jobs)
     .innerJoin(clients, eq(clients.id, jobs.clientId))
-    .where(and(sql`${jobs.status} <> 'purged'`, clientId ? eq(jobs.clientId, clientId) : undefined));
+    .where(and(sql`${jobs.status} <> 'purged'`, clientId ? eq(jobs.clientId, clientId) : undefined, jobId ? eq(jobs.id, jobId) : undefined));
   const held = await heldJobIds(app.db, now);
   const candidates: PurgeCandidate[] = [];
   let skippedLegalHold = 0;
@@ -119,11 +124,11 @@ export async function collectCandidates(app: FastifyInstance, now: Date, clientI
 
 export async function runPurge(
   app: FastifyInstance,
-  opts: { now?: Date; dryRun?: boolean; actor?: Actor; clientId?: string; everything?: boolean; ip?: string | null } = {},
+  opts: { now?: Date; dryRun?: boolean; actor?: Actor; clientId?: string; jobId?: string; everything?: boolean; ip?: string | null } = {},
 ): Promise<PurgeResult> {
   const now = opts.now ?? new Date();
   const actor = opts.actor ?? SYSTEM_RETENTION;
-  const { candidates, skippedLegalHold, skippedFeedbackHold } = await collectCandidates(app, now, opts.clientId, opts.everything);
+  const { candidates, skippedLegalHold, skippedFeedbackHold } = await collectCandidates(app, now, { clientId: opts.clientId, jobId: opts.jobId, everything: opts.everything });
   if (opts.dryRun) return { dryRun: true, candidates, purgedFiles: 0, purgedJobs: 0, skippedLegalHold, skippedFeedbackHold };
 
   const touchedJobs = new Set<string>();

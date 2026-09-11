@@ -127,6 +127,52 @@ describe.skipIf(!available)("retention purge", () => {
     expect([200, 400]).toContain(held.statusCode);
   });
 
+  it("purging one job leaves the client's other jobs alone", async () => {
+    const [c] = await ctx.db.insert(clients).values({ name: "Single, Job", normalizedName: "single, job" }).returning();
+    const target = await seed("needs_review", { client: c!.id });
+    const sibling = await seed("needs_review", { client: c!.id });
+
+    const wrong = await admin.post(`/api/jobs/${target}/purge-now`, { confirmJobId: "not-the-id" });
+    expect(wrong.statusCode).toBe(400);
+    expect(await liveKinds(target)).toHaveLength(7);
+
+    const ok = await admin.post(`/api/jobs/${target}/purge-now`, { confirmJobId: target.slice(0, 8) });
+    expect(ok.statusCode, ok.body).toBe(200);
+    expect(ok.json()).toEqual({ purgedFiles: 7, purged: true });
+    expect(await liveKinds(target)).toEqual([]);
+    expect(await liveKinds(sibling)).toHaveLength(7);
+
+    const [job] = await ctx.db.select().from(jobs).where(eq(jobs.id, target));
+    expect(job!.status).toBe("purged");
+    expect(job!.purgedAt).not.toBeNull();
+    const rows = await ctx.db.execute<{ n: number }>(sql`select count(*)::int as n from audit_events where action = 'file.purge' and target_id = ${target}`);
+    expect(Number(rows[0]!.n)).toBe(7);
+    const done = await ctx.db.execute<{ n: number }>(sql`select count(*)::int as n from audit_events where action = 'job.purge_now' and target_id = ${target}`);
+    expect(Number(done[0]!.n)).toBe(1);
+
+    // already purged, and a second job of the same client is still purgeable on its own
+    expect((await admin.post(`/api/jobs/${target}/purge-now`, { confirmJobId: target })).statusCode).toBe(400);
+    expect((await admin.post(`/api/jobs/${sibling}/purge-now`, { confirmJobId: sibling })).statusCode).toBe(200);
+  });
+
+  it("job purge is refused while processing, on legal hold, and for non-admins", async () => {
+    const running = await seed("needs_review");
+    await ctx.db.update(jobs).set({ status: "processing" }).where(eq(jobs.id, running));
+    expect((await admin.post(`/api/jobs/${running}/purge-now`, { confirmJobId: running })).statusCode).toBe(400);
+    expect(await liveKinds(running)).toHaveLength(7);
+
+    await admin.request("PATCH", `/api/clients/${heldClientId}`, { legalHold: true });
+    const held = await seed("needs_review", { client: heldClientId });
+    expect((await admin.post(`/api/jobs/${held}/purge-now`, { confirmJobId: held })).statusCode).toBe(400);
+
+    await ctx.db.insert(users).values({ email: "prep2@example.com", name: "P2", role: "preparer", passwordHash: await hashPassword("preparer-password-long") });
+    const prep = new Client(ctx.app);
+    await prep.login("prep2@example.com", "preparer-password-long");
+    const mine = await seed("needs_review");
+    expect((await prep.post(`/api/jobs/${mine}/purge-now`, { confirmJobId: mine })).statusCode).toBe(403);
+    expect(await liveKinds(mine)).toHaveLength(7);
+  });
+
   it("purge-now preview is a dry run; report lists due counts; non-admins are refused", async () => {
     await ctx.db.insert(users).values({ email: "prep@example.com", name: "P", role: "preparer", passwordHash: await hashPassword("preparer-password-long") });
     const prep = new Client(ctx.app);

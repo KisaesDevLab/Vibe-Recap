@@ -154,7 +154,7 @@ Runs after `validate`, before any audio is generated, and again on every manual 
 
 | Role | Can |
 |---|---|
-| `admin` | Everything: users, settings, retention policy, branding, email, audit log, purge now |
+| `admin` | Everything: users, settings, retention policy, branding, email, audit log, purge now (all due, one client, or one job) |
 | `preparer` | Upload, view, edit script, approve, release, download, delete own uploads within retention |
 | `staff` | Upload, view status, view video after approval, download after release |
 | `viewer` | View released videos only (e.g., front-desk or a reviewing partner who never uploads) |
@@ -171,7 +171,7 @@ Settings (admin):
 - **Audit log**: never purged by policy; export + truncate is a manual admin action.
 - **Per-client override**: any client record can pin a longer or shorter window; "legal hold" flag suspends purge for that client.
 
-Purge job: hourly; selects rows past their window; deletes the encrypted blob, shreds the per-file key, marks the row `purged` with timestamp and actor `system:retention`; writes an audit event. Admin "Purge now" runs the same code path with actor = user.
+Purge job: hourly; selects rows past their window; deletes the encrypted blob, shreds the per-file key, marks the row `purged` with timestamp and actor `system:retention`; writes an audit event. Admin "Purge now" runs the same code path with actor = user, at three scopes: everything due (Settings › Retention), one client (client page), or one job (job page, added 2026-09-11, QUESTIONS.md Q53). Every scope obeys legal hold and the thumbs-down hold, and a job still being processed is refused.
 
 ## 8. UI map
 

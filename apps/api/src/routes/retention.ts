@@ -1,11 +1,12 @@
 import type { FastifyInstance } from "fastify";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
-import { clients } from "../db/schema.js";
+import { clients, jobs } from "../db/schema.js";
 import { badRequest, notFound } from "../errors.js";
 import { actorOf, requireRole } from "../plugins/auth.js";
 import { audit } from "../services/audit.js";
 import { retentionReport, runPurge } from "../services/purge.js";
+import { heldJobIds } from "./feedback.js";
 import { getAllSettings, setSetting, type SettingKey } from "../services/settings.js";
 
 const RETENTION_KEYS = ["retention_source_days", "retention_extraction_days", "retention_video_days", "retention_failed_days"] as const satisfies readonly SettingKey[];
@@ -65,6 +66,30 @@ export async function retentionRoutes(app: FastifyInstance) {
       skippedFeedbackHold: result.skippedFeedbackHold,
       preview: result.candidates.slice(0, 500).map((c) => ({ jobId: c.job.id, clientId: c.job.clientId, kind: c.file.kind, reason: c.reason })),
     };
+  });
+
+  /** Purge one job's files, now. Admin types the job's short id to confirm; the same code path,
+   * the same audit row per file, and the same holds as the hourly run. */
+  app.post("/api/jobs/:id/purge-now", { preHandler: requireRole("admin") }, async (req) => {
+    const { id } = req.params as { id: string };
+    const body = z.object({ confirmJobId: z.string().max(80) }).parse(req.body);
+    const [row] = await app.db
+      .select({ job: jobs, client: clients })
+      .from(jobs)
+      .innerJoin(clients, eq(clients.id, jobs.clientId))
+      .where(eq(jobs.id, id))
+      .limit(1);
+    if (!row) throw notFound("Job not found");
+    const typed = body.confirmJobId.trim().toLowerCase();
+    if (typed !== id.toLowerCase() && typed !== id.slice(0, 8).toLowerCase()) throw badRequest("Type the job id shown above to confirm");
+    if (row.job.status === "purged") throw badRequest("This job has already been purged");
+    if (row.job.status === "queued" || row.job.status === "processing") throw badRequest("The worker is still using this job's files; wait for it to finish or fail");
+    if (row.client.legalHold) throw badRequest("The client is on legal hold; release the hold first");
+    if ((await heldJobIds(app.db, new Date())).has(id)) throw badRequest("This job is held for quality review; dismiss the feedback on Settings > Quality first");
+    const actor = actorOf(req);
+    const result = await runPurge(app, { actor, jobId: id, everything: true, ip: req.ip });
+    await audit(app.db, { actor, action: "job.purge_now", target: { type: "job", id }, ip: req.ip, meta: { purged_files: result.purgedFiles, purged: result.purgedJobs > 0 } });
+    return { purgedFiles: result.purgedFiles, purged: result.purgedJobs > 0 };
   });
 
   /** Purge every file of one client's jobs. Admin types the client name to confirm. */
