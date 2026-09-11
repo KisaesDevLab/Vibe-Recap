@@ -158,6 +158,8 @@ export interface JobDetailDto extends JobSummaryDto {
   files: FileDto[];
   events: JobEventDto[];
   rejectedReason: string | null;
+  /** Per-job narration voice picked on a re-render; null means the uploader's, then the firm's. */
+  voice: string | null;
   delivered: boolean;
   deliveredNote: string | null;
 }

@@ -92,7 +92,7 @@ Re-entry points, which the UI exposes as separate buttons:
 | Re-extract | `identify` through `recon` only |
 | Regenerate script | `script` → `validate` → `verify` |
 | Save script (manual edit) | `validate` → `verify` (no audio until both pass) |
-| Re-render (after reject or script edit) | `tts` |
+| Re-render (after reject or script edit), optionally in another voice | `tts` |
 
 Cross-cutting rules that are easy to miss:
 
@@ -171,8 +171,12 @@ Never commit a real tax return. `tests/fixtures/` contains synthetic 1040 packag
   sentence at a time). `tts.speakable()` rewrites money and decimals right before synthesis
   ("1,000 dollars", "11 point 7%"); captions, the transcript, the validator and the verifier keep
   the written `$1,000` and `11.7%`. Never normalize the stored script itself.
-- **Narration voice is per user, then per firm.** `users.voice` (set at Your account) wins over the
-  `voice` setting; `tts.resolve_voice()` is the one place that decides.
+- **Narration voice is per job, then per user, then per firm.** `jobs.voice` (set by a re-render from
+  the job page) wins over `users.voice` (Your account), which wins over the `voice` setting;
+  `tts.resolve_voice()` is the one place that decides. The voice list lives in two files that must
+  stay in step: `packages/shared/src/enums.ts` and `worker/recap/render/tts.py`.
+- **A failed re-render leaves the previous video in place**, so the job page can show a new script
+  beside old narration. The Video card warns when the stored video is older than the stored script.
 - **Kokoro sentence timing.** Generate per-sentence WAVs and record durations; drive slide transitions from those durations, not from word counts.
 - **Argon2id in Node** needs the native `argon2` package; alpine images need `build-base` at build time. Use the `-bookworm-slim` base.
 - **Batch staging lives in Redis, not Postgres.** Staged-but-unqueued rows expire after 1 h; do not create `jobs` rows until the preparer clicks Queue.

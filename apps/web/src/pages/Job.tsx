@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router";
-import type { JobDetailDto } from "@vibe-recap/shared";
+import { VOICES, type JobDetailDto } from "@vibe-recap/shared";
 import { useApi } from "../lib/useApi";
 import { ApiError, post } from "../lib/api";
 import { useAuth } from "../lib/auth";
@@ -97,6 +97,8 @@ export function JobPage() {
             <dl className="grid grid-cols-2 gap-y-1 text-sm">
               <dt className="text-slate-500">Job id</dt>
               <dd className="font-mono text-xs">{job.id}</dd>
+              <dt className="text-slate-500">Voice</dt>
+              <dd>{job.voice ? (VOICES[job.voice as keyof typeof VOICES] ?? job.voice) : "default"}</dd>
               <dt className="text-slate-500">Software</dt>
               <dd>{job.software ?? "unknown"}</dd>
               <dt className="text-slate-500">Pages</dt>

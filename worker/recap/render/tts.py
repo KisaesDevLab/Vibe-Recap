@@ -16,11 +16,25 @@ from typing import Any, Callable
 
 import numpy as np
 
+# Every one of these ships inside voices-v1.0.bin; the letter is Kokoro's published quality grade.
+# Keep in step with VOICES in packages/shared/src/enums.ts.
 VOICES = {
-    "af_heart": "Heart (female, American)",
-    "af_bella": "Bella (female, American)",
-    "am_michael": "Michael (male, American)",
-    "am_adam": "Adam (male, American)",
+    "af_heart": "Heart (American female, A)",
+    "af_bella": "Bella (American female, A-)",
+    "af_nicole": "Nicole (American female, B-)",
+    "af_aoede": "Aoede (American female, C+)",
+    "af_kore": "Kore (American female, C+)",
+    "af_sarah": "Sarah (American female, C+)",
+    "af_nova": "Nova (American female, C)",
+    "af_alloy": "Alloy (American female, C)",
+    "am_michael": "Michael (American male, C+)",
+    "am_fenrir": "Fenrir (American male, C+)",
+    "am_puck": "Puck (American male, C+)",
+    "am_adam": "Adam (American male, F+)",
+    "bf_emma": "Emma (British female, B-)",
+    "bf_isabella": "Isabella (British female, C)",
+    "bm_george": "George (British male, C)",
+    "bm_fable": "Fable (British male, C)",
 }
 DEFAULT_VOICE = "af_heart"
 SAMPLE_RATE = 24000
@@ -181,12 +195,14 @@ def _slide_texts(script: str) -> list[tuple[str, str]]:
 
 
 def resolve_voice(ctx: Any) -> str:
-    """The uploader's own voice preference, else the firm-wide setting, else the default."""
-    chosen = None
-    try:
-        chosen = ctx.db.user_voice((ctx.job or {}).get("uploaded_by"))
-    except Exception:  # noqa: BLE001 - a preference must never fail a job
-        ctx.log.warning("could not read the uploader's voice preference; using the firm setting")
+    """This job's own voice (set on a re-render), else the uploader's, else the firm's, else the default."""
+    job = ctx.job or {}
+    chosen = job.get("voice")
+    if not chosen:
+        try:
+            chosen = ctx.db.user_voice(job.get("uploaded_by"))
+        except Exception:  # noqa: BLE001 - a preference must never fail a job
+            ctx.log.warning("could not read the uploader's voice preference; using the firm setting")
     chosen = chosen or (ctx.settings or {}).get("voice")
     return chosen if chosen in VOICES else DEFAULT_VOICE
 

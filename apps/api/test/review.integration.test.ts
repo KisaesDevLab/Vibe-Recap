@@ -143,6 +143,32 @@ describe.skipIf(!available)("approval gating, reject, re-render, bulk approve", 
     expect(rr2.json().resumeFrom).toBe("validate"); // stale verification: must re-verify first
   });
 
+  it("re-render can change this job's narration voice, and the voice sticks to the job", async () => {
+    const jobId = await seedJob({ verification: { passed: true, items: [], source_sha256: "s", script_sha256: sha(golden) } });
+    await admin.post(`/api/jobs/${jobId}/reject`, { reason: "Client asked for a male narrator" });
+
+    const bad = await admin.post(`/api/jobs/${jobId}/rerender`, { voice: "not_a_voice" });
+    expect(bad.statusCode).toBe(400);
+
+    const rr = await admin.post(`/api/jobs/${jobId}/rerender`, { voice: "am_fenrir" });
+    expect(rr.statusCode, rr.body).toBe(200);
+    expect(rr.json().voice).toBe("am_fenrir");
+    const [withVoice] = await ctx.db.select().from(jobs).where(eq(jobs.id, jobId));
+    expect(withVoice!.voice).toBe("am_fenrir");
+
+    // a later re-render without a voice keeps the one already on the job
+    await ctx.db.update(jobs).set({ status: "needs_review" }).where(eq(jobs.id, jobId));
+    const again = await admin.post(`/api/jobs/${jobId}/rerender`);
+    expect(again.json().voice).toBe("am_fenrir");
+
+    // and null clears it, back to the uploader's own voice then the firm default
+    await ctx.db.update(jobs).set({ status: "needs_review" }).where(eq(jobs.id, jobId));
+    const cleared = await admin.post(`/api/jobs/${jobId}/rerender`, { voice: null });
+    expect(cleared.json().voice).toBe(null);
+    const [after] = await ctx.db.select().from(jobs).where(eq(jobs.id, jobId));
+    expect(after!.voice).toBe(null);
+  });
+
   it("bulk approve takes only clean jobs, skips exceptions and flags, one audit row each with bulk:true", async () => {
     const clean1 = await seedJob({ verification: { passed: true, items: [], source_sha256: "s", script_sha256: sha(golden) } });
     const clean2 = await seedJob({ verification: { passed: true, items: [], source_sha256: "s", script_sha256: sha(golden) } });

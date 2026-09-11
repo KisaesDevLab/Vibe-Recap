@@ -1,9 +1,9 @@
 import { useState } from "react";
-import type { JobDetailDto } from "@vibe-recap/shared";
+import { VOICES, type JobDetailDto } from "@vibe-recap/shared";
 import { useApi } from "../lib/useApi";
 import { ApiError, patch, post } from "../lib/api";
 import { useAuth } from "../lib/auth";
-import { Alert, Badge, Button, Card, Input, Textarea } from "../ui";
+import { Alert, Badge, Button, Card, Input, Select, Textarea } from "../ui";
 
 function DeliveredBox({ job, onChanged }: { job: JobDetailDto; onChanged: () => void }) {
   const [note, setNote] = useState(job.deliveredNote ?? "");
@@ -36,8 +36,15 @@ export function VideoPanel({ job, onChanged }: { job: JobDetailDto; onChanged: (
   const [rejecting, setRejecting] = useState(false);
   const [reason, setReason] = useState("");
   const [captions, setCaptions] = useState(true);
+  const [voice, setVoice] = useState(job.voice ?? "");
 
   const hasVideo = job.files.some((f) => f.kind === "video" && !f.purgedAt);
+  // The pipeline always re-narrates after a script change, so a video older than the stored script
+  // means the re-render never finished (it failed at validate, verify, or tts). Say so, because the
+  // script on screen and the narration in the player disagree until it is re-rendered.
+  const videoAt = job.files.find((f) => f.kind === "video" && !f.purgedAt)?.createdAt;
+  const scriptAt = job.files.find((f) => f.kind === "script" && !f.purgedAt)?.createdAt;
+  const staleVideo = !!videoAt && !!scriptAt && new Date(videoAt) < new Date(scriptAt);
   const role = user?.role ?? "viewer";
   const canSee = hasVideo && (can("preparer") || (role === "staff" && ["approved", "released"].includes(job.status)) || (role === "viewer" && job.status === "released"));
 
@@ -66,10 +73,37 @@ export function VideoPanel({ job, onChanged }: { job: JobDetailDto; onChanged: (
       actions={
         reviewer ? (
           <>
-            {["rejected", "failed"].includes(job.status) && (
-              <Button size="sm" variant="secondary" disabled={busy} onClick={() => act(`/api/jobs/${job.id}/rerender`, undefined, "Re-rendering from narration.")}>
-                Re-render
-              </Button>
+            {["rejected", "failed", "needs_review"].includes(job.status) && (
+              <span className="flex items-center gap-1">
+                <Select
+                  className="h-8 py-0 text-xs"
+                  value={voice}
+                  disabled={busy}
+                  title="Narration voice for this job. Blank uses your account's voice, then the firm default."
+                  onChange={(e) => setVoice(e.target.value)}
+                >
+                  <option value="">Default voice</option>
+                  {Object.entries(VOICES).map(([k, v]) => (
+                    <option key={k} value={k}>
+                      {v}
+                    </option>
+                  ))}
+                </Select>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={busy}
+                  onClick={() =>
+                    act(
+                      `/api/jobs/${job.id}/rerender`,
+                      { voice: voice || null },
+                      voice === (job.voice ?? "") ? "Re-rendering from narration." : `Re-rendering in ${voice ? VOICES[voice as keyof typeof VOICES] : "the default voice"}.`,
+                    )
+                  }
+                >
+                  Re-render
+                </Button>
+              </span>
             )}
             {["needs_review", "approved"].includes(job.status) && (
               <Button size="sm" variant="danger" disabled={busy} onClick={() => setRejecting((v) => !v)}>
@@ -98,6 +132,14 @@ export function VideoPanel({ job, onChanged }: { job: JobDetailDto; onChanged: (
       {job.status === "needs_review" && approval && !approval.ok && (
         <div className="mb-3">
           <Alert kind="warning">Approve is disabled: {approval.reason}</Alert>
+        </div>
+      )}
+      {staleVideo && !["queued", "processing"].includes(job.status) && (
+        <div className="mb-3">
+          <Alert kind="warning">
+            This video was narrated from an earlier version of the script, so the narration you hear is not the script above. Re-render to bring
+            them back in step.
+          </Alert>
         </div>
       )}
       {job.status === "rejected" && job.rejectedReason && (

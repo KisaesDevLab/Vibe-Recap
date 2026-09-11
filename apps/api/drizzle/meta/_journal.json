@@ -43,6 +43,13 @@
       "when": 1789133188185,
       "tag": "0005_user_voice",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1789140309716,
+      "tag": "0006_job_voice",
+      "breakpoints": true
     }
   ]
 }

@@ -176,9 +176,11 @@ def test_voice_prefers_the_uploaders_choice_then_the_firm_setting():
             assert user_id == "u1"
             return self.voice
 
-    def ctx(user_voice, firm_voice):
-        return SimpleNamespace(db=FakeDb(user_voice), job={"uploaded_by": "u1"}, settings={"voice": firm_voice}, log=logging.getLogger("t"))
+    def ctx(user_voice, firm_voice, job_voice=None):
+        return SimpleNamespace(db=FakeDb(user_voice), job={"uploaded_by": "u1", "voice": job_voice}, settings={"voice": firm_voice}, log=logging.getLogger("t"))
 
+    # a voice picked for this one job on a re-render beats both
+    assert tts.resolve_voice(ctx("am_michael", "af_heart", job_voice="bm_george")) == "bm_george"
     assert tts.resolve_voice(ctx("am_michael", "af_heart")) == "am_michael"
     assert tts.resolve_voice(ctx(None, "am_adam")) == "am_adam"
     assert tts.resolve_voice(ctx(None, None)) == tts.DEFAULT_VOICE

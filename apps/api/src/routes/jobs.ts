@@ -88,6 +88,7 @@ export async function jobDetail(db: Db, id: string): Promise<JobDetailDto> {
     files: fileDtos,
     events,
     rejectedReason: row.job.rejectedReason,
+    voice: row.job.voice,
     delivered: row.job.delivered,
     deliveredNote: row.job.deliveredNote,
   };

@@ -94,13 +94,28 @@ export const SOFTWARE_LABELS: Record<string, string> = {
   unknown: "unknown software",
 };
 
-/** Kokoro narration voices bundled in the worker image. The firm sets a default; each user may
- * pick their own under Your account, and jobs they upload are narrated in it. */
+/** Kokoro narration voices, all of them inside the `voices-v1.0.bin` already in the worker image.
+ * The letter is Kokoro's own published quality grade (hexgrad/Kokoro-82M VOICES.md): af_heart and
+ * af_bella are the only A-grade voices, and am_adam is kept only because installs already set it.
+ * The firm sets a default, each user may pick their own under Your account, and a single job can be
+ * re-rendered in another voice from the job page. Keep in step with worker/recap/render/tts.py. */
 export const VOICES = {
-  af_heart: "Heart (female)",
-  af_bella: "Bella (female)",
-  am_michael: "Michael (male)",
-  am_adam: "Adam (male)",
+  af_heart: "Heart — American female (A)",
+  af_bella: "Bella — American female (A-)",
+  af_nicole: "Nicole — American female (B-)",
+  af_aoede: "Aoede — American female (C+)",
+  af_kore: "Kore — American female (C+)",
+  af_sarah: "Sarah — American female (C+)",
+  af_nova: "Nova — American female (C)",
+  af_alloy: "Alloy — American female (C)",
+  am_michael: "Michael — American male (C+)",
+  am_fenrir: "Fenrir — American male (C+)",
+  am_puck: "Puck — American male (C+)",
+  am_adam: "Adam — American male (F+)",
+  bf_emma: "Emma — British female (B-)",
+  bf_isabella: "Isabella — British female (C)",
+  bm_george: "George — British male (C)",
+  bm_fable: "Fable — British male (C)",
 } as const;
 export type Voice = keyof typeof VOICES;
 export const VOICE_CODES = Object.keys(VOICES) as Voice[];

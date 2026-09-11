@@ -27,7 +27,7 @@ Positioning inside the Vibe suite: a **standalone appliance** with its own UI, u
 | L16 | Recon gate exceptions: a `preparer` may downgrade a named check to a warning with a written reason; audited; the job proceeds. The downgrade is per job, never global. | Q10. |
 | L17 | One firm per install. No multi-tenancy. | Q7. |
 | L18 | Greeting uses first name(s) only, from the return; setting to disable. | Q5. |
-| L19 | Four bundled Kokoro voices. The firm picks a default in settings; each user may pick their own under Your account, and the recaps they upload are narrated in it (amended 2026-09-11, QUESTIONS.md Q51). | Q3. |
+| L19 | Bundled Kokoro voices (16 English ones exposed, all already in `voices-v1.0.bin`). The firm picks a default in settings; each user may pick their own under Your account; and one job can be re-rendered in another voice from its own page (amended 2026-09-11, QUESTIONS.md Q51, Q54, Q55). | Q3. |
 | L20 | All states in the package are summarized; resident state in detail, others by result only. | Q9. |
 | L21 | Source PDF default retention 30 days. | Q6. |
 | L22 | Batch upload: many PDFs (or a ZIP of PDFs) in one action; each PDF becomes its own independent job. Client is auto-matched from the taxpayer name on the return and confirmed by the preparer before the batch is queued. Jobs process serially; one failure never blocks the others. | Kurt 2026-09-03. |

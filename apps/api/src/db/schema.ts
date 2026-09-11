@@ -159,6 +159,8 @@ export const jobs = pgTable(
     sourceSha256: text("source_sha256").notNull(),
     priorSha256: text("prior_sha256"),
     note: text("note"),
+    /** Narration voice chosen for this job on a re-render; null falls back to the uploader, then the firm. */
+    voice: text("voice"),
     pageCount: integer("page_count"),
     textCoverage: integer("text_coverage"),
     errorStep: text("error_step"),

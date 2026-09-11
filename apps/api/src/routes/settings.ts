@@ -2,7 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { z } from "zod";
-import { VOICES } from "@vibe-recap/shared";
+import { VOICES, VOICE_CODES } from "@vibe-recap/shared";
 import { actorOf, requireRole } from "../plugins/auth.js";
 import { audit } from "../services/audit.js";
 import { ollamaStatus } from "../services/ollama.js";
@@ -37,7 +37,7 @@ const generalBody = z.object({
   color_primary: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
   color_secondary: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
   signoff_sentence: z.string().max(300).optional(),
-  voice: z.enum(["af_heart", "af_bella", "am_michael", "am_adam"]).optional(),
+  voice: z.enum(VOICE_CODES as [string, ...string[]]).optional(),
   llm_provider: z.enum(["router", "ollama"]).optional(),
   router_model: z.string().max(120).optional(),
   model_name: z.string().max(100).optional(),

@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { and, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
-import { roleAtLeast, type VerificationDto } from "@vibe-recap/shared";
+import { roleAtLeast, VOICE_CODES, type VerificationDto } from "@vibe-recap/shared";
 import { files, jobEvents, jobs, type FileRow } from "../db/schema.js";
 import { badRequest, forbidden, notFound } from "../errors.js";
 import { actorOf, requireRole } from "../plugins/auth.js";
@@ -10,6 +10,8 @@ import { readJson } from "./extraction.js";
 import { batchDto, listJobSummaries, loadJob, requeue } from "./jobs.js";
 
 const rejectBody = z.object({ reason: z.string().min(3).max(2000) });
+/** `voice` re-narrates this one job in another voice; null clears the override, absent leaves it. */
+const rerenderBody = z.object({ voice: z.enum(VOICE_CODES as [string, ...string[]]).nullable().optional() });
 
 async function fileOf(app: FastifyInstance, jobId: string, kind: FileRow["kind"]): Promise<FileRow | null> {
   const [row] = await app.db
@@ -97,15 +99,22 @@ export async function reviewRoutes(app: FastifyInstance) {
     return { ok: true };
   });
 
-  /** Re-render from tts with the current (already validated and verified) script. */
+  /** Re-render from tts with the current (already validated and verified) script, optionally in a
+   * different narration voice. The voice sticks to the job, so later re-renders keep it. */
   app.post("/api/jobs/:id/rerender", { preHandler: requireRole("preparer") }, async (req) => {
     const { id } = req.params as { id: string };
+    const body = rerenderBody.parse(req.body ?? {});
     const row = await loadJob(app.db, id);
     if (!["rejected", "needs_review", "failed"].includes(row.job.status)) throw badRequest(`Cannot re-render a ${row.job.status} job`);
+    const voice = body.voice === undefined ? row.job.voice : body.voice;
+    if (body.voice !== undefined && body.voice !== row.job.voice) {
+      await app.db.update(jobs).set({ voice: body.voice, updatedAt: new Date() }).where(eq(jobs.id, id));
+      await app.db.insert(jobEvents).values({ jobId: id, status: "queued", step: "tts", message: `narration voice set to ${body.voice ?? "the uploader's default"}` });
+    }
     const ver = await readJson<VerificationDto>(app, id, "verification");
     const from = ver && ver.data.passed && ver.data.script_sha256 === row.job.scriptSha256 ? "tts" : "validate";
-    await requeue(app, id, from, "job.rerender", actorOf(req), req.ip);
-    return { ok: true, resumeFrom: from };
+    await requeue(app, id, from, "job.rerender", actorOf(req), req.ip, { voice });
+    return { ok: true, resumeFrom: from, voice };
   });
 
   /** Approve every needs_review job in the batch with zero flags and no recon exceptions. One audit row each. */

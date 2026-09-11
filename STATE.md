@@ -117,6 +117,20 @@ total tax (verifier now feeds back into the retry loop), and the "tax year exact
   purged job, a queued/processing job, a client on legal hold, or a job held by a thumbs-down.
   Covered by two tests in `retention.integration.test.ts`.
 
+## Voice per job, more voices, stale-video warning (2026-09-11)
+
+- Q54: `jobs.voice` (migration `0006_job_voice`) is a per-job override set through
+  `POST /api/jobs/:id/rerender` `{ voice }` — a code sets it, `null` clears it, absent keeps it. The
+  Video card on the job page shows a voice picker beside Re-render for `needs_review`, `rejected`
+  and `failed` jobs. `tts.resolve_voice()` resolves job -> uploader -> firm -> `af_heart`.
+- Q55: the picker now offers 16 English voices instead of 4. They were always inside
+  `voices-v1.0.bin` (54 voices; the other 26 are for languages `lang="en-us"` cannot use). Labels
+  carry Kokoro's published grade; `VOICES` in `packages/shared/src/enums.ts` and in
+  `worker/recap/render/tts.py` must stay in step.
+- Q56: a job can show a new script beside old narration when a re-render failed part way, because a
+  failure leaves the previous video in place. The Video card now compares the video file's timestamp
+  with the script file's and warns when the video is the older of the two.
+
 ## Deviations from the plan
 
 - Phase 2: the "kill the worker mid-job, the rest continue" test is deferred to Phase 3 where the
