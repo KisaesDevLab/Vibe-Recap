@@ -137,7 +137,7 @@ export function SettingsGeneralPage() {
             <Field label="Sign-off sentence" hint="Closes every script, verbatim.">
               <Input name="signoff_sentence" defaultValue={s.signoff_sentence} />
             </Field>
-            <Field label="Narration voice">
+            <Field label="Default narration voice" hint="Used when a user has not picked their own voice under Your account.">
               <Select name="voice" defaultValue={s.voice}>
                 {Object.entries(data.voices).map(([k, v]) => (
                   <option key={k} value={k}>

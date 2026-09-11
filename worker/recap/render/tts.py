@@ -170,6 +170,17 @@ def _slide_texts(script: str) -> list[tuple[str, str]]:
 # ---------------------------------------------------------------------------
 
 
+def resolve_voice(ctx: Any) -> str:
+    """The uploader's own voice preference, else the firm-wide setting, else the default."""
+    chosen = None
+    try:
+        chosen = ctx.db.user_voice((ctx.job or {}).get("uploaded_by"))
+    except Exception:  # noqa: BLE001 - a preference must never fail a job
+        ctx.log.warning("could not read the uploader's voice preference; using the firm setting")
+    chosen = chosen or (ctx.settings or {}).get("voice")
+    return chosen if chosen in VOICES else DEFAULT_VOICE
+
+
 def synthesize(ctx: Any, synth: Synth | None = None) -> None:
     from ..pipeline import StepFailed, load_file, replace_files
 
@@ -180,7 +191,7 @@ def synthesize(ctx: Any, synth: Synth | None = None) -> None:
         ctx.script = raw.decode("utf-8")
     if ctx.verification is None or not ctx.verification.get("passed"):
         raise StepFailed("tts", "verification has not passed; no audio is produced until it does")
-    voice = (ctx.settings or {}).get("voice") or DEFAULT_VOICE
+    voice = resolve_voice(ctx)
     try:
         fn = synth or kokoro_synth(ctx.cfg.models_dir, voice)
         narration = narrate(ctx.script, fn)

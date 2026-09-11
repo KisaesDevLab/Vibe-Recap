@@ -85,6 +85,14 @@ class Db:
             rows = c.execute("select key, value from settings").fetchall()
         return {r["key"]: r["value"] for r in rows}
 
+    def user_voice(self, user_id: str | None) -> str | None:
+        """The narration voice the uploading user picked, or None to use the firm default."""
+        if not user_id:
+            return None
+        with self.conn() as c:
+            row = c.execute("select voice from users where id = %s", (user_id,)).fetchone()
+        return (row or {}).get("voice") or None
+
     def get_client(self, client_id: str) -> dict[str, Any] | None:
         with self.conn() as c:
             return c.execute("select * from clients where id = %s", (client_id,)).fetchone()

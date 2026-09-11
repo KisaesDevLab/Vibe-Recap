@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { z } from "zod";
+import { VOICES } from "@vibe-recap/shared";
 import { actorOf, requireRole } from "../plugins/auth.js";
 import { audit } from "../services/audit.js";
 import { ollamaStatus } from "../services/ollama.js";
@@ -49,7 +50,8 @@ const generalBody = z.object({
   greeting_use_first_names: z.boolean().optional(),
 });
 
-export const VOICES = { af_heart: "Heart (female)", af_bella: "Bella (female)", am_michael: "Michael (male)", am_adam: "Adam (male)" };
+/** Re-exported so existing imports of VOICES from this module keep working. */
+export { VOICES };
 
 function profilesDir(app: FastifyInstance): string {
   return path.join(app.config.DATA_DIR, "form-profiles");

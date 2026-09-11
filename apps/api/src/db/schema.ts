@@ -27,6 +27,8 @@ export const users = pgTable("users", {
   lockedUntil: timestamp("locked_until", { withTimezone: true }),
   lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
   mustChangePassword: boolean("must_change_password").notNull().default(false),
+  /** Narration voice for recaps this user uploads; null falls back to the firm-wide setting. */
+  voice: text("voice"),
   totpSecret: text("totp_secret"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

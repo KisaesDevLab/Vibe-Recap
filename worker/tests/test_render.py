@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import shutil
 import wave
@@ -152,6 +153,24 @@ def test_end_to_end_mp4_duration_and_vtt_cues(tmp_path):
     assert abs(total - expected) / expected < 0.10
     vtt = tts.to_vtt(narration.sentences)
     assert vtt.count("-->") == len(narration.sentences)
+
+
+def test_voice_prefers_the_uploaders_choice_then_the_firm_setting():
+    class FakeDb:
+        def __init__(self, voice):
+            self.voice = voice
+
+        def user_voice(self, user_id):
+            assert user_id == "u1"
+            return self.voice
+
+    def ctx(user_voice, firm_voice):
+        return SimpleNamespace(db=FakeDb(user_voice), job={"uploaded_by": "u1"}, settings={"voice": firm_voice}, log=logging.getLogger("t"))
+
+    assert tts.resolve_voice(ctx("am_michael", "af_heart")) == "am_michael"
+    assert tts.resolve_voice(ctx(None, "am_adam")) == "am_adam"
+    assert tts.resolve_voice(ctx(None, None)) == tts.DEFAULT_VOICE
+    assert tts.resolve_voice(ctx("nope", None)) == tts.DEFAULT_VOICE  # a voice no longer bundled
 
 
 def test_mux_step_refuses_without_audio():

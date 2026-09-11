@@ -1,8 +1,9 @@
 import { useState, type FormEvent } from "react";
 import { useSearchParams } from "react-router";
 import { useAuth } from "../lib/auth";
-import { ApiError, post } from "../lib/api";
-import { Alert, Button, Card, Field, Input, PageTitle } from "../ui";
+import { ApiError, post, put } from "../lib/api";
+import { Alert, Button, Card, Field, Input, PageTitle, Select } from "../ui";
+import { VOICES } from "@vibe-recap/shared";
 
 /** Every role: who am I, and change my password. Forced here while must-change-password is set. */
 export function AccountPage() {
@@ -14,6 +15,24 @@ export function AccountPage() {
   const [confirm, setConfirm] = useState("");
   const [msg, setMsg] = useState<{ kind: "error" | "success"; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [voice, setVoice] = useState(user?.voice ?? "");
+  const [voiceMsg, setVoiceMsg] = useState<string | null>(null);
+  const [voiceBusy, setVoiceBusy] = useState(false);
+
+  async function saveVoice(e: FormEvent) {
+    e.preventDefault();
+    setVoiceBusy(true);
+    setVoiceMsg(null);
+    try {
+      await put("/api/auth/preferences", { voice: voice || null });
+      await refresh();
+      setVoiceMsg(voice ? `Your recaps will be narrated by ${VOICES[voice as keyof typeof VOICES]}.` : "Your recaps will use the firm's default voice.");
+    } catch (err) {
+      setVoiceMsg(err instanceof ApiError ? err.message : "Could not save the voice");
+    } finally {
+      setVoiceBusy(false);
+    }
+  }
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -54,6 +73,25 @@ export function AccountPage() {
             <dd>{user?.role}</dd>
           </dl>
           <p className="mt-4 text-xs text-slate-500">Name, email, and role are managed by an administrator under Settings › Users.</p>
+        </Card>
+        <Card title="Narration voice">
+          <form onSubmit={saveVoice} className="space-y-3">
+            <Field label="Voice" hint="Used for the recaps you upload. The firm default applies until you choose one.">
+              <Select value={voice} onChange={(e) => setVoice(e.target.value)}>
+                <option value="">Firm default</option>
+                {Object.entries(VOICES).map(([k, v]) => (
+                  <option key={k} value={k}>
+                    {v}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Button type="submit" disabled={voiceBusy}>
+              {voiceBusy ? "Saving..." : "Save voice"}
+            </Button>
+            {voiceMsg && <p className="text-xs text-slate-500">{voiceMsg}</p>}
+            <p className="text-xs text-slate-500">Takes effect on the next recap you queue, and on any recap you re-render.</p>
+          </form>
         </Card>
         <Card title="Change password">
           <form onSubmit={submit} className="space-y-3">

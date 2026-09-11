@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { CookieSerializeOptions } from "@fastify/cookie";
 import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
-import type { MeResponse, UserDto } from "@vibe-recap/shared";
+import { VOICE_CODES, type MeResponse, type UserDto } from "@vibe-recap/shared";
 import { users, type User } from "../db/schema.js";
 import { checkPasswordPolicy, hashPassword, verifyPassword } from "../auth/password.js";
 import { SESSION_COOKIE, createSession, destroySession, destroyOtherSessions, destroyUserSessions } from "../auth/session.js";
@@ -34,6 +34,7 @@ export function toUserDto(u: User): UserDto {
     createdAt: u.createdAt.toISOString(),
     lastLoginAt: u.lastLoginAt ? u.lastLoginAt.toISOString() : null,
     mustChangePassword: u.mustChangePassword,
+    voice: u.voice,
   };
 }
 
@@ -47,6 +48,7 @@ export async function issueResetLink(app: FastifyInstance, user: User, req: Fast
 
 const loginBody = z.object({ email: z.string().max(200), password: z.string().max(512) });
 const changePasswordBody = z.object({ currentPassword: z.string().max(512), newPassword: z.string().max(512) });
+const preferencesBody = z.object({ voice: z.enum(VOICE_CODES as [string, ...string[]]).nullable().optional() });
 
 // A dummy hash so a login for an unknown email costs the same as a wrong password.
 let dummyHash: string | null = null;
@@ -136,6 +138,16 @@ export async function authRoutes(app: FastifyInstance) {
   app.get("/api/auth/me", async (req): Promise<MeResponse> => {
     const user = currentUser(req);
     return { user: toUserDto(user), csrfToken: req.auth!.session.csrfToken };
+  });
+
+  /** Personal preferences. The narration voice a user picks here is used for the recaps they
+   * upload; clearing it falls back to the firm default under Settings > General. */
+  app.put("/api/auth/preferences", async (req) => {
+    const user = currentUser(req);
+    const body = preferencesBody.parse(req.body);
+    const voice = body.voice ?? null;
+    await app.db.update(users).set({ voice, updatedAt: sql`now()` }).where(eq(users.id, user.id));
+    return { voice };
   });
 
   app.post("/api/auth/change-password", async (req) => {

@@ -10,6 +10,8 @@ export interface UserDto {
   lastLoginAt: string | null;
   /** Set by an admin reset or a temporary password; the UI routes to /account until cleared. */
   mustChangePassword: boolean;
+  /** Narration voice for recaps this user uploads; null means the firm default. */
+  voice: string | null;
 }
 
 export interface MeResponse {

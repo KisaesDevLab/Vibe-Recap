@@ -93,3 +93,15 @@ export const SOFTWARE_LABELS: Record<string, string> = {
   proseries: "ProSeries",
   unknown: "unknown software",
 };
+
+/** Kokoro narration voices bundled in the worker image. The firm sets a default; each user may
+ * pick their own under Your account, and jobs they upload are narrated in it. */
+export const VOICES = {
+  af_heart: "Heart (female)",
+  af_bella: "Bella (female)",
+  am_michael: "Michael (male)",
+  am_adam: "Adam (male)",
+} as const;
+export type Voice = keyof typeof VOICES;
+export const VOICE_CODES = Object.keys(VOICES) as Voice[];
+export const DEFAULT_VOICE: Voice = "af_heart";
