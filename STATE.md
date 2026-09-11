@@ -101,6 +101,8 @@ total tax (verifier now feeds back into the retry loop), and the "tax year exact
 ## Releases
 
 - v0.1.0 (2026-09-05): first release, all nine phases.
+- v0.2.1 (2026-09-11): narration spells out decimals ("11 point 7%"); espeak had been reading
+  "11.7%" at the end of a sentence as "eleven. seven percent" (Q52).
 - v0.2.0 (2026-09-11): everything after the first release — UltraTax-only staging and feedback
   (Q45, Q46), the appliance seed-admin and cookie fixes (Q47), accounts and outgoing email (Q48),
   licensing removed (Q49), the delivery-note close (Q50), per-user narration voices (Q51), and

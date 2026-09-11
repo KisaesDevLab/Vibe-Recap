@@ -1,6 +1,6 @@
 {
   "name": "vibe-recap",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "license": "PolyForm-Small-Business-1.0.0",
   "engines": { "node": ">=24" },
