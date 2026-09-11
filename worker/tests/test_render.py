@@ -57,10 +57,22 @@ def test_speakable_moves_the_dollar_sign_after_the_number():
     assert tts.speakable("You paid $1 more.") == "You paid 1 dollar more."
     assert tts.speakable("A $1.01 credit.") == "A 1 dollar and 1 cent credit."
     assert tts.speakable("A $1,234.56 balance.") == "A 1,234 dollars and 56 cents balance."
-    assert tts.speakable("About $1.2 million.") == "About 1.2 million dollars."
+    assert tts.speakable("About $1.2 million.") == "About 1 point 2 million dollars."
     assert tts.speakable("We show ($500) and -$500.") == "We show negative 500 dollars and negative 500 dollars."
     assert tts.speakable("Your rate was 22%.") == "Your rate was 22%."  # espeak already says "percent"
     assert tts.speakable("(see $1,200) today") == "(see 1,200 dollars) today"  # unrelated parens survive
+
+
+def test_speakable_spells_out_decimals():
+    # espeak takes the decimal point for the end of the sentence when the number ends it:
+    # "Your rate was 11.7%." comes out as "eleven. seven percent".
+    assert tts.speakable("Your effective rate was 11.7%.") == "Your effective rate was 11 point 7%."
+    assert tts.speakable("Withholding covered 126.5% of your tax.") == "Withholding covered 126 point 5% of your tax."
+    assert tts.speakable("It rose 0.5%.") == "It rose 0 point 5%."
+    assert tts.speakable("It was 12.25%.") == "It was 12 point 2 5%."  # each fraction digit on its own
+    assert tts.speakable("Your rate was 22%.") == "Your rate was 22%."  # whole percentages are left alone
+    assert tts.speakable("A $1,234.56 balance.") == "A 1,234 dollars and 56 cents balance."  # cents, not "point"
+    assert tts.speakable("We filed on 1.2.3 lines.") == "We filed on 1.2.3 lines."  # not a number we write
 
 
 def test_narration_is_spoken_but_captions_keep_the_written_form():

@@ -37,9 +37,15 @@ MONEY_RE = re.compile(
     r"(?P<scale>\s+(?:thousand|million|billion))?(?(paren)\))"
 )
 
+# espeak also mistakes the decimal point for the end of the sentence when the number is the last
+# thing in it: "Your rate was 11.7%." comes out as "eleven. seven percent", while the same number
+# mid-sentence is read correctly. Narration is synthesized one sentence at a time and a sentence
+# often ends on a percentage, so every decimal is spelled out instead ("11 point 7%").
+DECIMAL_RE = re.compile(r"(?<![\w.])(\d{1,3}(?:,\d{3})*|\d+)\.(\d+)(?![\w.])")
+
 
 def speakable(text: str) -> str:
-    """Narration form of a sentence: '$1,000' -> '1,000 dollars', '($1)' -> 'negative 1 dollar'."""
+    """Narration form of a sentence: '$1,000' -> '1,000 dollars', '11.7%' -> '11 point 7%'."""
 
     def repl(m: re.Match[str]) -> str:
         num, cents, scale = m.group("num"), m.group("cents"), (m.group("scale") or "").strip()
@@ -52,7 +58,11 @@ def speakable(text: str) -> str:
             said = f"{num} {'dollar' if num == '1' else 'dollars'}"
         return ("negative " if m.group("neg") or m.group("paren") else "") + said
 
-    return MONEY_RE.sub(repl, text)
+    def decimal(m: re.Match[str]) -> str:
+        # "11.7" -> "11 point 7", "12.25" -> "12 point 2 5"; each fraction digit is said on its own.
+        return f"{m.group(1)} point " + " ".join(m.group(2))
+
+    return DECIMAL_RE.sub(decimal, MONEY_RE.sub(repl, text))
 
 
 @dataclass

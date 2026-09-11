@@ -84,7 +84,9 @@ total tax (verifier now feeds back into the retry loop), and the "tax year exact
   rewrites amounts into words immediately before synthesis ("1,000 dollars", "1 dollar",
   "1,234 dollars and 56 cents", "1.2 million dollars", "negative 500 dollars"). It touches only the
   audio: the captions, the transcript, the validator, and the verifier all still see the written
-  `$1,000`. Percentages already spoke correctly. Covered by `test_render.py`.
+  `$1,000`. Decimals are spelled out for the same reason ("11 point 7%"): espeak reads the decimal
+  point as the end of the sentence when the number ends one, so "Your rate was 11.7%." came out as
+  "eleven. seven percent". The `%` sign itself is fine. Covered by `test_render.py`.
 - Closing section (Q50): the recap is delivered *with* the finished return, not ahead of a review
   meeting. Prompt rule 9 now forbids mentioning a meeting, an appointment, payment options, or
   anything the client must do, and asks for "your complete copy is on its way; contact us with any
