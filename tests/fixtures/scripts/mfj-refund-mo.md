@@ -11,4 +11,4 @@ Federal withholding from your paychecks came to $17,900, which was more than you
 [[slide:observations]]
 Compared with last year, your adjusted gross income rose by $7,500, an increase of 5.4%. Your total tax was almost unchanged, down $67 from the prior year, and your refund grew by $1,597. Withholding covered 126.5% of your total tax, so a little more than needed was taken out of your pay during the year.
 [[slide:next]]
-At your review we can talk about whether your withholding still fits your situation for the year ahead, and about anything on the horizon that could change the picture. We look forward to reviewing this with you.
+A complete copy of your return, with every form and schedule behind it, is being delivered to you along with this summary. Keep it with your records; the figures in this recap all come straight from it. If anything here is unclear or you would like to go over a number in more detail, our office is glad to help. Please contact us with any questions.

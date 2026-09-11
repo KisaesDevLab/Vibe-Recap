@@ -11,4 +11,4 @@ Withholding from your wages was $11,200, and you made estimated payments of $1,5
 [[slide:observations]]
 Withholding covered 78.1% of your total tax this year, which is why a balance remained at filing time. The return also includes an underpayment penalty because the payments made during the year did not keep pace with the tax as it accrued.
 [[slide:next]]
-At your review we can look at adjusting your withholding or your estimated payments so that next year's balance is smaller, and we can talk through the IRA distributions and what they mean going forward. We look forward to reviewing this with you.
+A complete copy of your return, including every form and schedule, is being delivered to you with this summary. Keep it with your records, since every figure in this recap comes from those pages. If anything here is unclear or you would like more detail on a number, our office is glad to help. Please contact us with any questions.

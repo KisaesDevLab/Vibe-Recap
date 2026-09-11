@@ -110,10 +110,10 @@ def test_yoy_without_prior_source_fails():
 def test_bank_account_and_address_and_name_checks():
     case = "mfj-refund-mo"
     pdf = str(FIXTURES / f"proseries-1040-2025-{case}.pdf")
-    with_acct = golden(case).replace("We look forward", "Your account 123456789 is on file. We look forward")
+    with_acct = golden(case).replace("Please contact us", "Your account 123456789 is on file. Please contact us")
     v = verify(with_acct, pdf, None, str(PROFILES))
     assert any(k == "absence" for k, _, _ in flagged(v))
-    with_addr = golden(case).replace("We look forward", "We have 123 Example Street on file. We look forward")
+    with_addr = golden(case).replace("Please contact us", "We have 123 Example Street on file. Please contact us")
     v = verify(with_addr, pdf, None, str(PROFILES))
     assert any(k == "absence" and t == "address" for k, t, _ in flagged(v))
     wrong_name = golden(case).replace("Hi Alex and Jordan.", "Hi Taylor and Jordan.")

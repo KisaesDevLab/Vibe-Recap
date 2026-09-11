@@ -11,4 +11,4 @@ You paid in $6,400 through withholding, and refundable credits added another $1,
 [[slide:observations]]
 Your withholding covered 206.5% of your total tax, which is why the federal refund was so large. In plain terms, a good part of each paycheck went to the government during the year and is only coming back to you now.
 [[slide:next]]
-At your review we can discuss whether adjusting your withholding would put more of that money in your pocket during the year instead of waiting for it at filing time. We look forward to reviewing this with you.
+A complete copy of both returns is being delivered to you with this summary, so you have every form and schedule for your records. Everything you just heard comes straight from those pages. If any part of it is unclear, our office is glad to walk you through it. Please contact us with any questions.

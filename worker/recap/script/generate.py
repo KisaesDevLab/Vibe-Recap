@@ -148,7 +148,7 @@ def render_prompt(section: str, ex: dict[str, Any], settings: dict[str, Any], no
         facts=build_facts(ex),
         observation_facts=build_observation_facts(ex),
         preparer_note=(note or "").strip() or None,
-        signoff_sentence=settings.get("signoff_sentence") or "We look forward to reviewing this with you.",
+        signoff_sentence=settings.get("signoff_sentence") or "Please contact us with any questions.",
         target_words=int(settings.get("target_words") or 350),
     ).strip()
 

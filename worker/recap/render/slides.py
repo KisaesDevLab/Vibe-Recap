@@ -83,7 +83,7 @@ def build_context(ex: dict[str, Any], settings: dict[str, Any]) -> dict[str, Any
         "firm_logo": settings.get("firm_logo") or None,
         "primary": settings.get("color_primary") or "#1f3a5f",
         "secondary": settings.get("color_secondary") or "#e8b04b",
-        "signoff": settings.get("signoff_sentence") or "We look forward to reviewing this with you.",
+        "signoff": settings.get("signoff_sentence") or "Please contact us with any questions.",
         "tax_year": meta.get("tax_year"),
         "filing_status": FILING_STATUS_TEXT.get(meta.get("filing_status"), ""),
         "names": names,
