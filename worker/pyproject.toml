@@ -1,6 +1,6 @@
 [project]
 name = "vibe-recap-worker"
-version = "0.1.0"
+version = "0.2.0"
 description = "Vibe Recap extraction and render pipeline"
 requires-python = ">=3.12"
 license = { text = "PolyForm-Small-Business-1.0.0" }

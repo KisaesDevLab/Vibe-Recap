@@ -26,7 +26,7 @@ const schema = z.object({
   SESSION_ABSOLUTE_DAYS: z.coerce.number().default(7),
   LOGIN_MAX_FAILURES: z.coerce.number().int().default(10),
   LOGIN_LOCKOUT_MINUTES: z.coerce.number().default(15),
-  RECAP_VERSION: z.string().default("0.1.0"),
+  RECAP_VERSION: z.string().default("0.2.0"),
   /** Run migrations at boot (default). The Vibe Appliance sets false and runs `migrate` explicitly. */
   MIGRATIONS_AUTO: bool.default(true),
   /** Comma-separated list of allowed Origin values for state-changing requests; empty = same-origin only. */
