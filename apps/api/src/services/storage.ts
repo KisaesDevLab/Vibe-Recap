@@ -126,6 +126,25 @@ export class Storage {
     return dec.decrypt(await fs.readFile(this.abs(rel)));
   }
 
+  /**
+   * Wrap a short secret (the single sign-on client secret, a session's ID token) to the master
+   * recipient for storage in Postgres. Base64 of the age ciphertext. `rotate-master-key`
+   * re-wraps the stored client secret; anything else wrapped here must tolerate a failed unwrap.
+   */
+  async wrapSecret(plaintext: string): Promise<string> {
+    const { recipient } = this.requireMaster();
+    const enc = new age.Encrypter();
+    enc.addRecipient(recipient);
+    return Buffer.from(await enc.encrypt(plaintext)).toString("base64");
+  }
+
+  async unwrapSecret(wrapped: string): Promise<string> {
+    const { identity } = this.requireMaster();
+    const dec = new age.Decrypter();
+    dec.addIdentity(identity);
+    return dec.decrypt(Buffer.from(wrapped, "base64"), "text");
+  }
+
   async exists(rel: string): Promise<boolean> {
     try {
       await fs.access(this.abs(rel));

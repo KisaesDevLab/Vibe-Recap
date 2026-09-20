@@ -19,11 +19,24 @@ export function newToken(bytes = 32): string {
   return randomBytes(bytes).toString("base64url");
 }
 
+/** One spelling of an issuer URL, so the row written at sign-in matches the logout token later. */
+function normalizeIssuer(issuer: string): string {
+  return issuer.replace(/\/+$/, "") + "/";
+}
+
+/** What a single sign-on session remembers about where it came from (Q57). */
+export interface SessionOidc {
+  issuer: string;
+  subject: string;
+  sid?: string | null;
+  idTokenWrapped?: string | null;
+}
+
 export async function createSession(
   db: Db,
   userId: string,
   policy: SessionPolicy,
-  meta: { ip?: string; userAgent?: string },
+  meta: { ip?: string; userAgent?: string; oidc?: SessionOidc },
   now = new Date(),
 ): Promise<Session> {
   const id = newToken(32);
@@ -39,6 +52,10 @@ export async function createSession(
       expiresAt,
       ip: meta.ip ?? null,
       userAgent: meta.userAgent?.slice(0, 300) ?? null,
+      oidcIssuer: meta.oidc ? normalizeIssuer(meta.oidc.issuer) : null,
+      oidcSubject: meta.oidc?.subject ?? null,
+      oidcSid: meta.oidc?.sid ?? null,
+      oidcIdTokenWrapped: meta.oidc?.idTokenWrapped ?? null,
     })
     .returning();
   return row!;
@@ -91,6 +108,32 @@ export async function destroyOtherSessions(db: Db, userId: string, keepId: strin
   const rows = await db
     .delete(sessions)
     .where(and(eq(sessions.userId, userId), ne(sessions.id, keepId)))
+    .returning({ id: sessions.id });
+  return rows.length;
+}
+
+/**
+ * Back-channel logout from the identity provider (Q57). A logout token that names an IdP session
+ * (`sid`) ends only the sessions born from it; one that names just the subject ends every
+ * single sign-on session of that identity. Local-password sessions of the same user are left
+ * alone: the identity provider did not start them and cannot speak for them.
+ */
+export async function destroySessionsByIdentity(
+  db: Db,
+  identity: { issuer: string; subject?: string; sid?: string; userId?: string },
+): Promise<number> {
+  const issuer = normalizeIssuer(identity.issuer);
+  const scope = identity.sid
+    ? eq(sessions.oidcSid, identity.sid)
+    : identity.subject
+      ? eq(sessions.oidcSubject, identity.subject)
+      : identity.userId
+        ? eq(sessions.userId, identity.userId)
+        : null;
+  if (!scope) return 0;
+  const rows = await db
+    .delete(sessions)
+    .where(and(eq(sessions.oidcIssuer, issuer), scope))
     .returning({ id: sessions.id });
   return rows.length;
 }

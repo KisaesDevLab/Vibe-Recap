@@ -22,6 +22,7 @@ import { ForgotPasswordPage } from "./pages/ForgotPassword";
 import { ResetPasswordPage } from "./pages/ResetPassword";
 import { AccountPage } from "./pages/Account";
 import { SettingsEmailPage } from "./pages/SettingsEmail";
+import { SettingsAuthPage } from "./pages/SettingsAuth";
 import { Alert, Spinner } from "./ui";
 
 function RequireAuth({ children }: { children: ReactNode }) {
@@ -51,6 +52,8 @@ export function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      {/* Unlinked on purpose: the break-glass way in when single sign-on is the only mode (Q57). */}
+      <Route path="/login/local" element={<LoginPage breakglass />} />
       <Route path="/setup" element={<SetupPage />} />
       <Route path="/invite/:token" element={<InvitePage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
@@ -103,6 +106,7 @@ export function App() {
           <Route path="retention" element={<SettingsRetentionPage />} />
           <Route path="users" element={<SettingsUsersPage />} />
           <Route path="email" element={<SettingsEmailPage />} />
+          <Route path="authentication" element={<SettingsAuthPage />} />
           <Route path="audit" element={<SettingsAuditPage />} />
           <Route path="quality" element={<SettingsQualityPage />} />
           <Route path="backup" element={<SettingsBackupPage />} />

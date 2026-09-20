@@ -134,6 +134,40 @@ total tax (verifier now feeds back into the retry loop), and the "tax year exact
   failure leaves the previous video in place. The Video card now compares the video file's timestamp
   with the script file's and warns when the video is the older of the two.
 
+## Single sign-on through Vibe Auth (2026-09-20)
+
+Branch `vibe-auth-integration`, not merged, not released. Q57 to Q60; operator notes in `docs/sso.md`.
+
+- The api embeds `@kisaesdevlab/vibe-auth` 1.0.5 and serves `/auth/*` (`src/lib/vibeAuth.ts`,
+  registered right after the auth plugin). Modes `local` (default) / `both` / `oidc_only`. A
+  single sign-on yields an ordinary `sessions` row and `recap_sid` cookie; the SPA gets its CSRF
+  token from `/api/auth/me` as after any reload. `src/lib/vibeAuthUsers.ts` is the user adapter,
+  role map and audit sink; `src/vibeAuthAdapter.ts` serves the `breakglass` CLI, which the image
+  exposes as an entrypoint subcommand and a PATH shim.
+- Migration `0007_vibe_auth`: the package's three tables, `sessions.oidc_*`, `users.sso_only`.
+- Beyond the Vibe Auth plan: accounts created by single sign-on cannot self-reset (Q59); role sync
+  never demotes the last active admin; the break-glass account is guarded in every mode and is
+  neither a first admin nor "another admin" (Q58); `/setup` is refused in `oidc_only`;
+  `rotate-master-key` re-wraps a saved client secret.
+- Web: `LoginPanel` around the password form, `/login/local`, Settings › Authentication, badges
+  and disabled actions under Settings › Users, sign-out through `/auth/oidc/logout?local=1` for a
+  single sign-on session.
+- Routing: `/auth/*` to the api in the Caddyfile, the Vite proxy and the appliance manifest, which
+  also gained `requires: ["identity"]` and the `sso` block (validates against the appliance schema).
+- Verified: 104 api tests (88 existing + 16 in `sso.integration.test.ts` against a fake identity
+  provider), web typecheck and tests, the api image builds with the token as a BuildKit secret and
+  carries none of it, `breakglass status --json` runs inside that image from the entrypoint's
+  working directory.
+- **Not verified**: a real browser against a real authentik (the first real test of
+  `SameSite=Strict` across the redirect back); anything on the appliance. The Vibe-Appliance
+  vendored manifest is deliberately untouched: it must change only after an image with single
+  sign-on is released (checklist in `docs/sso.md`).
+- **Needs Kurt** (Q60): give this repository access to the `vibe-auth` package or CI fails at
+  `npm ci`; decide whether the package goes public, since the public repo no longer builds without
+  a token. Building locally: `NODE_AUTH_TOKEN=$(gh auth token) docker compose build`.
+- Dev box: Vibe-1099's test containers hold ports 55432/56379; run Recap's tests against other
+  ports with `TEST_DATABASE_URL` / `TEST_REDIS_URL`.
+
 ## Deviations from the plan
 
 - Phase 2: the "kill the worker mid-job, the rest continue" test is deferred to Phase 3 where the

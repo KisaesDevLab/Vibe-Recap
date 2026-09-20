@@ -31,7 +31,7 @@ It is a **separate product** from the rest of the Vibe suite. It shares conventi
 | DB | PostgreSQL 16 (via Docker), Drizzle ORM + migrations |
 | Queue | Redis 7 + BullMQ |
 | UI | React 19 + Vite + Tailwind; no component framework, own primitives |
-| Auth | Local accounts, Argon2id, session cookies (httpOnly, SameSite=Strict); WebAuthn passkeys optional in Phase 6 |
+| Auth | Local accounts, Argon2id, session cookies (httpOnly, SameSite=Strict); WebAuthn passkeys optional in Phase 6. Optional single sign-on through Vibe Auth (`@kisaesdevlab/vibe-auth`, OIDC), off by default (Q57, `docs/sso.md`) |
 | Worker runtime | Python 3.12 (extraction + render pipeline), separate container |
 | PDF text | pdfplumber (text-layer PDFs) |
 | OCR fallback | GLM-OCR via Ollama, only when a page has no text layer |
@@ -53,8 +53,9 @@ The docs name these commands; they become real as each phase lands. Confirm agai
 
 | Task | Command |
 |---|---|
-| Full stack from clean checkout | `docker compose up --build` |
+| Full stack from clean checkout | `NODE_AUTH_TOKEN=$(gh auth token) docker compose up --build` (the build reads `@kisaesdevlab/vibe-auth` from GitHub Packages, Q60; `docker compose up` with the published images needs no token) |
 | Create first admin from CLI | `docker compose run api seed-admin` (or the `/setup` page while `users` is empty) |
+| Single sign-on break-glass account | `docker compose exec api breakglass ensure\|rotate\|status --json` (`docs/sso.md`) |
 | TS tests (api, web, shared) | `npm test` |
 | Python tests (worker) | `pytest` from `worker/` |
 | Single Python test | `pytest path/to/test_file.py::test_name` (pytest node-id syntax) |
@@ -109,7 +110,7 @@ Cross-cutting rules that are easy to miss:
 1a. **Every amount and fact in the script must be verified against the uploaded return itself**, not just the extraction. The verifier (`worker/recap/verify/`) does its own text pass over the source PDF and traces each amount to a page and line label, recomputes percentages and YoY deltas from what it finds, and checks tax year, filing status, names, deduction type, refund-vs-owed direction, state presence, and PII absence. It must not import from `extract`. A job cannot reach `needs_review`, and Approve is disabled, while any verification item is flagged. Spec: `docs/PLAN.md` §5a.
 2. **Arithmetic reconciliation gate.** Extracted 1040 lines must foot to the return's own totals within $1 before a script is generated. Failures surface to the preparer as an extraction problem, not a silent video.
 3. **Preparer approval before release; delivery is download only.** No share links, no portal, no Vibe Connect. A video is never downloadable until a user with `preparer` or `admin` role clicks Approve. The approve action snapshots the script and the extracted JSON.
-4. **No outbound network calls from the worker** except to the Vibe AI Router (via `airouter-proxy` on the egress-denied network; default script-generation provider since Kurt's 2026-09-05 decision, QUESTIONS.md Q37) and to Ollama (bundled container, or the host gateway when `OLLAMA_URL` points at the host). Enforce with an egress-denied network in compose plus socat relays for exactly those two targets. The API container may reach the router and `api.emailit.com` (outgoing email to firm users only, off until an admin enables it; Kurt's 2026-09-05 decision, QUESTIONS.md Q48). The licensing server and license key were removed on Kurt's 2026-09-05 instruction (Q49); the product is PolyForm-licensed with no phone-home. There are no other integrations; do not add any. What leaves the box through the router is the script prompt (extracted figures, first names, filing status, states, preparer note), never the PDF; the router's task-class policy (`recap_script`) governs which provider serves it.
+4. **No outbound network calls from the worker** except to the Vibe AI Router (via `airouter-proxy` on the egress-denied network; default script-generation provider since Kurt's 2026-09-05 decision, QUESTIONS.md Q37) and to Ollama (bundled container, or the host gateway when `OLLAMA_URL` points at the host). Enforce with an egress-denied network in compose plus socat relays for exactly those two targets. The API container may reach the router and `api.emailit.com` (outgoing email to firm users only, off until an admin enables it; Kurt's 2026-09-05 decision, QUESTIONS.md Q48). Once single sign-on is configured it may also reach the firm's identity provider (Vibe Auth; Kurt's 2026-09-20 decision, QUESTIONS.md Q57): discovery, keys and the token exchange, nothing from a return. The licensing server and license key were removed on Kurt's 2026-09-05 instruction (Q49); the product is PolyForm-licensed with no phone-home. There are no other integrations; do not add any. What leaves the box through the router is the script prompt (extracted figures, first names, filing status, states, preparer note), never the PDF; the router's task-class policy (`recap_script`) governs which provider serves it.
 5. **Retention is enforced by a job, not by trust.** The purge worker runs hourly and is the only thing that deletes files. Purges are logged to the audit table. A thumbs-down on a job (Q46) holds its files for 90 days or until an admin dismisses it; the hold moves the date, it never adds a deleter.
 6. **Extracted values are never hand-edited.** If a line is misread, the form profile is wrong. Fix the profile and re-extract. Recon failures may be downgraded to warnings per job by a preparer, with a reason, audited.
 7. **No PII in logs.** Log job IDs and file hashes, never names, SSNs, or amounts. Redact structured logs at the logger level, not by convention.
@@ -128,13 +129,14 @@ vibe-recap/
     PLAN.md
     PHASES.md
     INSTALL.md
+    sso.md
   compose.yml
   compose.override.example.yml
   .env.example
   Caddyfile
   apps/
     web/          React UI
-    api/          Fastify API, auth, settings, retention, audit, email
+    api/          Fastify API, auth (local + single sign-on), settings, retention, audit, email
   worker/
     recap/
       extract/    pdf text-layer mapper, form profiles, OCR fallback, recon gate
@@ -181,12 +183,25 @@ Never commit a real tax return. `tests/fixtures/` contains synthetic 1040 packag
 - **Argon2id in Node** needs the native `argon2` package; alpine images need `build-base` at build time. Use the `-bookworm-slim` base.
 - **Batch staging lives in Redis, not Postgres.** Staged-but-unqueued rows expire after 1 h; do not create `jobs` rows until the preparer clicks Queue.
 - **BullMQ from Python** requires the job data shape to be plain JSON and the queue name to match exactly (`recap`).
+- **Single sign-on is additive and lives outside `/api/`.** `/auth/*` is served by
+  `@kisaesdevlab/vibe-auth` through `src/lib/vibeAuth.ts`; the blanket "session required" hook does
+  not cover it, but the Origin allow-list and the CSRF check do, so the Settings › Authentication
+  page sends `x-csrf-token`. Every place `/api/*` is routed to the api must route `/auth/*` too
+  (Caddyfile, Vite proxy, `.appliance/manifest.json`). The login route must keep calling
+  `app.vibeAuth.localLoginAllowed()` and `afterLocalLogin()` with the break-glass **username**, not
+  its email, or `oidc_only` and the break-glass audit event silently stop working.
+- **The break-glass account is a row in `users`** under `vibe-breakglass@vibe-recap.local`. Anything
+  that counts users or admins (`/setup`, `seed-admin`, last-admin protection) must exclude it, and
+  nothing in Settings › Users may disable, demote or re-password it (`lib/vibeAuthUsers.ts`).
+- **The vibe-auth stores hand `Date` values to `$1` SQL**, which postgres.js `unsafe()` does not
+  serialize; `textParam()` in `src/lib/vibeAuth.ts` sends everything as text. The package also pulls
+  in Express as a peer; nothing loads it.
 - **Password-reset and invite tokens live in Redis**, hashed (`pwreset:<sha256>`, 1 h) and plain (`invite:<token>`, 24 h) respectively; a new reset request revokes the previous one; `consumeResetToken` uses GETDEL so a link works once. Links are built from the `public_url` setting, then `PUBLIC_URL`, then the first `ALLOWED_ORIGIN`, then the request origin.
 
 ## Definition of done for any phase
 
 - All deliverables implemented.
 - `npm test` and `pytest` green.
-- `docker compose up --build` from a clean checkout produces a working stack on the reference box.
+- `docker compose up --build` (with `NODE_AUTH_TOKEN`, see Commands) from a clean checkout produces a working stack on the reference box.
 - `STATE.md` updated: phase status, deviations, what the next phase should know.
 - Commit and stop.

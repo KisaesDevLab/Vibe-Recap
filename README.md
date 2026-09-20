@@ -56,6 +56,7 @@ Reference hardware: a GMKtec NucBox M6 (Ryzen 5 6600H, 32 GB). Model inference i
 ## Development
 
 ```bash
+# once: a GitHub token with read:packages in ~/.npmrc, for @kisaesdevlab/vibe-auth (docs/sso.md)
 npm install
 npm run build -w packages/shared
 npm run test:services            # throwaway Postgres + Redis in Docker
@@ -64,6 +65,9 @@ cd worker && python -m venv .venv && .venv/Scripts/pip install -e ".[dev,render]
 python scripts/make-fixture.py   # regenerate synthetic fixtures (six layouts, three cases)
 python scripts/smoke-e2e.py      # upload a fixture through a running stack
 ```
+
+Building the images yourself needs the same token: `NODE_AUTH_TOKEN=$(gh auth token) docker compose build`.
+The published images need none.
 
 Render tests need ffmpeg and Playwright's Chromium (`playwright install chromium`); they skip
 otherwise. The narration model files are downloaded into `worker/models/` for local runs and

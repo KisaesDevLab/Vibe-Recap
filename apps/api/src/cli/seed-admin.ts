@@ -4,13 +4,14 @@
  * or with env ADMIN_EMAIL / ADMIN_NAME / ADMIN_PASSWORD.
  * Refuses to run when any user already exists.
  */
-import { count } from "drizzle-orm";
+import { count, ne } from "drizzle-orm";
 import { loadConfig } from "../config.js";
 import { createDb } from "../db/index.js";
 import { runMigrations } from "../db/migrate.js";
 import { users } from "../db/schema.js";
 import { checkPasswordPolicy, hashPassword } from "../auth/password.js";
 import { audit } from "../services/audit.js";
+import { BREAKGLASS_EMAIL } from "../lib/vibeAuthUsers.js";
 
 async function main() {
   // Positional args, then ADMIN_*, then the Vibe Appliance's SEED_ADMIN_* conventions.
@@ -31,7 +32,8 @@ async function main() {
   const config = loadConfig();
   const { db, close } = createDb(config.DATABASE_URL, { max: 2 });
   await runMigrations(db);
-  const [row] = await db.select({ n: count() }).from(users);
+  // The single sign-on break-glass account (Q57) may already be there; it is not a first admin.
+  const [row] = await db.select({ n: count() }).from(users).where(ne(users.email, BREAKGLASS_EMAIL));
   if ((row?.n ?? 0) > 0) {
     // Idempotent for orchestrators that re-run the seed on every enable.
     console.log("users already exist; nothing to seed (use /settings/users to add more)");

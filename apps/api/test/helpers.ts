@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
+import type { Redis } from "ioredis";
 import { loadConfig, type Config } from "../src/config.js";
 import { createDb, type Db } from "../src/db/index.js";
 import { runMigrations } from "../src/db/migrate.js";
@@ -32,6 +33,7 @@ export const TEST_REDIS_URL = process.env.TEST_REDIS_URL ?? "redis://localhost:5
 export interface TestContext {
   app: FastifyInstance;
   db: Db;
+  redis: Redis;
   config: Config;
   storage: Storage;
   stager: FakeStager;
@@ -82,7 +84,10 @@ export class FakeEmailClient implements EmailClient {
   }
 }
 
-export async function createTestContext(overrides: Partial<Config> = {}, deps: { emailClient?: EmailClient } = {}): Promise<TestContext> {
+export async function createTestContext(
+  overrides: Partial<Config> = {},
+  deps: { emailClient?: EmailClient; /** Single sign-on env (VIBE_AUTH_MODE, VIBE_OIDC_*); empty = local mode. */ authEnv?: NodeJS.ProcessEnv } = {},
+): Promise<TestContext> {
   const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "recap-data-"));
   const config: Config = {
     ...loadConfig({}),
@@ -102,11 +107,13 @@ export async function createTestContext(overrides: Partial<Config> = {}, deps: {
   await storage.init();
   const stager = new FakeStager(storage);
   const email = (deps.emailClient as FakeEmailClient | undefined) ?? new FakeEmailClient();
-  const app = await buildApp({ config, db, redis, storage, stager, emailClient: email });
+  // Never the developer's own environment: a stray VIBE_AUTH_MODE would change every suite.
+  const app = await buildApp({ config, db, redis, storage, stager, emailClient: email, authEnv: deps.authEnv ?? {} });
   await app.ready();
   return {
     app,
     db,
+    redis,
     config,
     storage,
     stager,

@@ -17,6 +17,8 @@ export interface UserDto {
 export interface MeResponse {
   user: UserDto;
   csrfToken: string;
+  /** True when this session came from single sign-on; sign-out then goes through /auth/oidc/logout. */
+  sso: boolean;
 }
 
 export interface SetupStatus {

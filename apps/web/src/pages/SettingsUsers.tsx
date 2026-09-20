@@ -19,6 +19,10 @@ interface UserRow {
   passkeys: number;
   totp: boolean;
   lockedUntil: string | null;
+  /** Created by single sign-on and never given a local password (Q57). */
+  ssoOnly: boolean;
+  /** The single sign-on emergency account; managed by Vibe Auth, not from this page. */
+  breakglass: boolean;
 }
 
 export function SettingsUsersPage() {
@@ -97,7 +101,7 @@ export function SettingsUsersPage() {
                       <div className="text-xs text-slate-500">{u.email}</div>
                     </td>
                     <td className="py-2 pr-2">
-                      <Select value={u.role} disabled={busy || u.id === me?.id} onChange={(e) => run(() => patch(`/api/users/${u.id}`, { role: e.target.value }).then(() => undefined))} className="w-32">
+                      <Select value={u.role} disabled={busy || u.id === me?.id || u.breakglass} onChange={(e) => run(() => patch(`/api/users/${u.id}`, { role: e.target.value }).then(() => undefined))} className="w-32">
                         {ROLES.map((r) => (
                           <option key={r} value={r}>
                             {r}
@@ -109,6 +113,8 @@ export function SettingsUsersPage() {
                       {u.disabled ? <Badge tone="red">disabled</Badge> : <Badge tone="green">active</Badge>}
                       {u.mustChangePassword && <Badge tone="amber">must change password</Badge>}
                       {u.lockedUntil && new Date(u.lockedUntil) > new Date() && <Badge tone="red">locked</Badge>}
+                      {u.ssoOnly && <Badge tone="slate">single sign-on only</Badge>}
+                      {u.breakglass && <Badge tone="amber">break-glass</Badge>}
                     </td>
                     <td className="py-2 pr-2 text-slate-500">{u.lastLoginAt ? fmtDate(u.lastLoginAt) : "never"}</td>
                     <td className="py-2 pr-2 text-slate-500">
@@ -116,13 +122,13 @@ export function SettingsUsersPage() {
                     </td>
                     <td className="py-2 pr-2">
                       <div className="flex flex-wrap gap-1">
-                        <Button size="sm" variant="ghost" disabled={busy || u.id === me?.id} onClick={() => run(() => patch(`/api/users/${u.id}`, { disabled: !u.disabled }).then(() => undefined))}>
+                        <Button size="sm" variant="ghost" disabled={busy || u.id === me?.id || u.breakglass} onClick={() => run(() => patch(`/api/users/${u.id}`, { disabled: !u.disabled }).then(() => undefined))}>
                           {u.disabled ? "Enable" : "Disable"}
                         </Button>
                         <Button
                           size="sm"
                           variant="ghost"
-                          disabled={busy}
+                          disabled={busy || u.breakglass}
                           onClick={() => {
                             const p = window.prompt("Temporary password for this user (at least 12 characters):");
                             if (p) void run(() => post(`/api/users/${u.id}/reset-password`, { tempPassword: p }).then(() => undefined), "Password reset; the user must change it at next login.");
@@ -131,7 +137,7 @@ export function SettingsUsersPage() {
                           Set temporary password
                         </Button>
                         {emailOn && (
-                          <Button size="sm" variant="ghost" disabled={busy || u.disabled} onClick={() => run(() => post(`/api/users/${u.id}/send-reset-link`).then(() => undefined), "A one-hour reset link was emailed to the user.")}>
+                          <Button size="sm" variant="ghost" disabled={busy || u.disabled || u.breakglass} onClick={() => run(() => post(`/api/users/${u.id}/send-reset-link`).then(() => undefined), "A one-hour reset link was emailed to the user.")}>
                             Email reset link
                           </Button>
                         )}

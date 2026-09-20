@@ -49,6 +49,13 @@ product stays under the PolyForm Small Business License but has no license key, 
 server, no seat count, and no read-only mode. L12's API egress is therefore the router and
 Emailit only.
 
+**Amendment 2026-09-20 (Kurt, Q57):** L1's "own auth" and L12 are amended. Recap keeps its own
+accounts and adds optional single sign-on through Vibe Auth (`@kisaesdevlab/vibe-auth`, OIDC):
+modes `local` (default), `both`, `oidc_only` with a break-glass local admin. The API container's
+outbound destinations become the router, Emailit and, once configured, the firm's identity
+provider. Nothing from a return goes there; the worker's egress is unchanged; Recap still installs
+and runs on its own with single sign-on off. See `docs/sso.md` and QUESTIONS.md Q57 to Q60.
+
 ## 3. Architecture
 
 ```

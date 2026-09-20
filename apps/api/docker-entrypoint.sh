@@ -14,5 +14,8 @@ case "$1" in
   seed-admin) shift; exec node dist/cli/seed-admin.js "$@" ;;
   migrate) shift; exec node dist/cli/migrate.js "$@" ;;
   rotate-master-key) shift; exec node dist/cli/rotate-master-key.js "$@" ;;
+  # Single sign-on emergency account (Q57): breakglass ensure|rotate|status [--json]. The CLI reads
+  # "vibeAuth".adapter from ./package.json, so it must run from here; modules live at /app only.
+  breakglass) exec node /app/node_modules/@kisaesdevlab/vibe-auth/dist/cli.js "$@" ;;
   *) exec "$@" ;;
 esac

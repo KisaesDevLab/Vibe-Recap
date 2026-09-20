@@ -32,6 +32,7 @@ import { Queues, type Stager } from "./services/queue.js";
 import { StagingService } from "./services/staging.js";
 import { startCron } from "./services/cron.js";
 import { EmailitClient, type EmailClient } from "./services/email.js";
+import { registerVibeAuth } from "./lib/vibeAuth.js";
 
 declare module "fastify" {
   interface FastifyInstance {
@@ -57,6 +58,8 @@ export interface AppDeps {
   cron?: boolean;
   /** Override the outgoing-email client (tests use a fake that records messages). */
   emailClient?: EmailClient;
+  /** Where single sign-on reads VIBE_AUTH_MODE / VIBE_OIDC_* from (tests pass their own). Default: process.env. */
+  authEnv?: NodeJS.ProcessEnv;
 }
 
 export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
@@ -92,6 +95,8 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   await app.register(multipart, { limits: { fileSize: 2 * 1024 * 1024 * 1024, files: 200, fields: 10 } });
   await app.register(rateLimit, { global: false, redis: deps.redis, nameSpace: "recap-rl:" });
   await app.register(authPluginRegistered, { policy: app.sessionPolicy });
+  // Single sign-on (Q57): mounts /auth/* and decorates app.vibeAuth, which the login route consults.
+  await registerVibeAuth(app, { env: deps.authEnv });
 
   app.setErrorHandler((raw: unknown, req, reply) => {
     const err = raw as Error & { statusCode?: number; code?: string };

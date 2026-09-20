@@ -19,12 +19,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [setupNeeded, setSetupNeeded] = useState(false);
+  // True when the session came from single sign-on (Q57); decides how sign-out happens.
+  const [sso, setSso] = useState(false);
 
   const refresh = useCallback(async () => {
     try {
       const me = await get<MeResponse>("/api/auth/me");
       setCsrfToken(me.csrfToken);
       setUser(me.user);
+      setSso(me.sso);
       setSetupNeeded(false);
     } catch (err) {
       setCsrfToken(null);
@@ -46,17 +49,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const me = await post<MeResponse>("/api/auth/login", { email, password });
     setCsrfToken(me.csrfToken);
     setUser(me.user);
+    setSso(false);
     setSetupNeeded(false);
   }, []);
 
   const logout = useCallback(async () => {
+    if (sso) {
+      // A full navigation: the package ends this session, audits it, and lands on /login.
+      // local=1 signs out of Recap only; the other Vibe apps stay signed in at the identity provider.
+      window.location.assign("/auth/oidc/logout?local=1");
+      return new Promise<void>(() => {});
+    }
     try {
       await post("/api/auth/logout");
     } finally {
       setCsrfToken(null);
       setUser(null);
     }
-  }, []);
+  }, [sso]);
 
   const value = useMemo<AuthState>(
     () => ({

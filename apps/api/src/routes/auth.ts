@@ -6,13 +6,14 @@ import { VOICE_CODES, type MeResponse, type UserDto } from "@vibe-recap/shared";
 import { users, type User } from "../db/schema.js";
 import { checkPasswordPolicy, hashPassword, verifyPassword } from "../auth/password.js";
 import { SESSION_COOKIE, createSession, destroySession, destroyOtherSessions, destroyUserSessions } from "../auth/session.js";
-import { badRequest, locked, notFound, unauthorized } from "../errors.js";
+import { badRequest, forbidden, locked, notFound, unauthorized } from "../errors.js";
 import { audit, ANONYMOUS } from "../services/audit.js";
 import { currentUser } from "../plugins/auth.js";
 import { consumeResetToken, createResetToken, peekResetToken, revokeResetTokens, RESET_TTL_S } from "../auth/reset.js";
 import { emailConfig, publicUrl, sendEmail, trySendEmail } from "../services/email.js";
 import { passwordChangedEmail, passwordResetEmail } from "../services/email-templates.js";
 import { getSetting } from "../services/settings.js";
+import { isBreakglass, policyIdentifier, resolveLoginEmail } from "../lib/vibeAuthUsers.js";
 
 export function cookieOptions(app: FastifyInstance): CookieSerializeOptions {
   return {
@@ -59,7 +60,14 @@ export async function authRoutes(app: FastifyInstance) {
     { config: { auth: false, csrf: false, rateLimit: { max: 10, timeWindow: "1 minute" } } },
     async (req, reply) => {
       const body = loginBody.parse(req.body);
-      const email = body.email.trim().toLowerCase();
+      // The break-glass account signs in by its username; everyone else by email (Q57).
+      const email = resolveLoginEmail(body.email);
+      // In oidc_only mode the local form is closed to everyone but break-glass. Decided on what
+      // was typed, before any lookup, so the answer says nothing about which accounts exist.
+      if (!app.vibeAuth.localLoginAllowed(policyIdentifier(email)).allowed) {
+        await audit(app.db, { actor: ANONYMOUS, action: "auth.login_refused", ip: req.ip, meta: { why: "oidc_only" } });
+        throw forbidden("Local sign-in is turned off for this installation. Use single sign-on.");
+      }
       const [user] = await app.db.select().from(users).where(eq(users.email, email)).limit(1);
       const now = new Date();
 
@@ -116,8 +124,10 @@ export async function authRoutes(app: FastifyInstance) {
         target: { type: "user", id: user.id },
         ip: req.ip,
       });
+      // Writes vibe.auth.breakglass.used when this was the emergency account; silent otherwise.
+      await app.vibeAuth.afterLocalLogin({ userId: user.id, username: policyIdentifier(email), ip: req.ip });
       reply.setCookie(SESSION_COOKIE, session.id, cookieOptions(app));
-      const me: MeResponse = { user: toUserDto(user), csrfToken: session.csrfToken };
+      const me: MeResponse = { user: toUserDto(user), csrfToken: session.csrfToken, sso: false };
       return me;
     },
   );
@@ -137,7 +147,7 @@ export async function authRoutes(app: FastifyInstance) {
 
   app.get("/api/auth/me", async (req): Promise<MeResponse> => {
     const user = currentUser(req);
-    return { user: toUserDto(user), csrfToken: req.auth!.session.csrfToken };
+    return { user: toUserDto(user), csrfToken: req.auth!.session.csrfToken, sso: req.auth!.session.oidcIssuer !== null };
   });
 
   /** Personal preferences. The narration voice a user picks here is used for the recaps they
@@ -192,7 +202,14 @@ export async function authRoutes(app: FastifyInstance) {
       if (!cfg.enabled) throw badRequest("Password reset by email is not enabled on this installation. Ask an administrator to reset your password.");
       const email = body.email.trim().toLowerCase();
       const [user] = await app.db.select().from(users).where(eq(users.email, email)).limit(1);
-      if (user && !user.disabled) {
+      // An account that exists only through single sign-on, and the break-glass account, get the
+      // same generic answer and no email (Q57). The first has its factors at the identity
+      // provider, so a mailbox must not be enough to mint local credentials for it; an admin can
+      // still set a password or send a link from Settings > Users. The second has no mailbox.
+      const selfServiceClosed = user ? user.ssoOnly || isBreakglass(user) : false;
+      if (user && selfServiceClosed) {
+        await audit(app.db, { actor: ANONYMOUS, action: "auth.password_reset_refused", target: { type: "user", id: user.id }, ip: req.ip, meta: { why: user.ssoOnly ? "sso_only_account" : "breakglass_account" } });
+      } else if (user && !user.disabled) {
         try {
           await issueResetLink(app, user, req);
           await audit(app.db, { actor: ANONYMOUS, action: "auth.password_reset_requested", target: { type: "user", id: user.id }, ip: req.ip });
@@ -231,7 +248,7 @@ export async function authRoutes(app: FastifyInstance) {
       if (!(await consumeResetToken(app.redis, token))) throw notFound("This reset link is invalid or has expired");
       await app.db
         .update(users)
-        .set({ passwordHash: await hashPassword(body.password), mustChangePassword: false, failedLogins: 0, lockedUntil: null, updatedAt: new Date() })
+        .set({ passwordHash: await hashPassword(body.password), mustChangePassword: false, ssoOnly: false, failedLogins: 0, lockedUntil: null, updatedAt: new Date() })
         .where(eq(users.id, u.id));
       await destroyUserSessions(app.db, u.id);
       await audit(app.db, { actor: { id: u.id, label: u.email }, action: "user.password_reset_self", target: { type: "user", id: u.id }, ip: req.ip });

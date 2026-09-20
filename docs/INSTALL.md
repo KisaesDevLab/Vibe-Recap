@@ -105,6 +105,7 @@ job id). All of them run the same purge code, log one audit row per file, and ar
 client is on legal hold, the job is still processing, or a thumbs-down holds the job.
 Settings > Users: add preparers and staff; invite links are valid for 24 hours.
 Settings > Email: optional outgoing email so invites and password resets arrive by email (section 6c).
+Settings > Authentication: optional single sign-on through Vibe Auth (section 6d). Off by default.
 
 ## 6a. Vibe AI Router (default script provider)
 
@@ -144,6 +145,21 @@ attaches anything from a return.
    the settings export.
 
 Every user can change their own password at any time from their name in the top-right corner.
+
+## 6d. Single sign-on through Vibe Auth (optional)
+
+Staff can sign in through the firm's identity provider (Vibe Auth) instead of a Recap password.
+It is off until you turn it on, and local accounts keep working beside it. Register Recap with the
+Vibe Auth broker, put the `VIBE_OIDC_*` block it returns in `.env`, set `VIBE_AUTH_MODE=both`, and
+`docker compose up -d api`; the sign-in page then shows a *Sign in with Vibe Auth* button above the
+password form. Roles follow the person's Vibe groups. Before choosing `oidc_only` (the button
+only), create the break-glass account and store its password:
+
+```bash
+docker compose exec api breakglass ensure --json
+```
+
+Everything else, including the appliance checklist, is in [`sso.md`](sso.md).
 
 ## 6b. Installing on the Vibe Appliance
 

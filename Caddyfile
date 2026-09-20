@@ -18,6 +18,10 @@
 	handle /api/* {
 		reverse_proxy api:3000
 	}
+	# Single sign-on (Q57): /auth/status, the OIDC redirect and callback, back-channel logout.
+	handle /auth/* {
+		reverse_proxy api:3000
+	}
 	handle /healthz {
 		reverse_proxy api:3000
 	}

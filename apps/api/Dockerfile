@@ -1,12 +1,21 @@
 # syntax=docker/dockerfile:1
 # Build context is the repo root so the shared workspace package is available.
+#
+# `@kisaesdevlab/vibe-auth` (single sign-on, Q57) comes from GitHub Packages, which wants a token
+# with read:packages even to read. `.npmrc` maps the scope and holds no credential. The token
+# arrives as a BuildKit secret, is written to a throwaway user npmrc and deleted in the same RUN:
+# never an ARG or ENV, so it lands in no layer and no image history.
+#   NODE_AUTH_TOKEN=$(gh auth token) docker compose build
 FROM node:24-bookworm-slim AS build
 WORKDIR /src
-COPY package.json package-lock.json* tsconfig.base.json ./
+COPY package.json package-lock.json* tsconfig.base.json .npmrc ./
 COPY packages/shared/package.json packages/shared/
 COPY apps/api/package.json apps/api/
 COPY apps/web/package.json apps/web/
-RUN npm ci --workspaces --include-workspace-root
+RUN --mount=type=secret,id=NODE_AUTH_TOKEN,required=true \
+    printf '//npm.pkg.github.com/:_authToken=%s\n' "$(cat /run/secrets/NODE_AUTH_TOKEN)" > /root/.npmrc \
+ && npm ci --workspaces --include-workspace-root \
+  ; status=$? ; rm -f /root/.npmrc ; exit $status
 COPY packages/shared packages/shared
 COPY apps/api apps/api
 RUN npm run build -w packages/shared && npm run build -w apps/api \
@@ -29,7 +38,7 @@ COPY apps/api/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 # `docker exec <container> seed-admin`, which bypasses the entrypoint and needs a real
 # executable on PATH (the Vibe Appliance seeds the first admin this way; Q47).
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh && mkdir -p /data && chown node:node /data \
- && for cmd in seed-admin migrate rotate-master-key; do \
+ && for cmd in seed-admin migrate rotate-master-key breakglass; do \
       printf '#!/bin/sh\nexec /usr/local/bin/docker-entrypoint.sh %s "$@"\n' "$cmd" > /usr/local/bin/$cmd && chmod +x /usr/local/bin/$cmd; \
     done
 # Starts as root only to fix /data ownership on a fresh bind mount, then drops to uid 1000 (node).

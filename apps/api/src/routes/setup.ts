@@ -1,13 +1,14 @@
 import type { FastifyInstance } from "fastify";
-import { count, sql } from "drizzle-orm";
+import { count, ne, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { SetupStatus } from "@vibe-recap/shared";
 import { users } from "../db/schema.js";
 import { checkPasswordPolicy, hashPassword } from "../auth/password.js";
-import { badRequest, conflict } from "../errors.js";
+import { badRequest, conflict, forbidden } from "../errors.js";
 import { audit } from "../services/audit.js";
 import { SESSION_COOKIE, createSession } from "../auth/session.js";
 import { cookieOptions } from "./auth.js";
+import { BREAKGLASS_EMAIL } from "../lib/vibeAuthUsers.js";
 
 const setupBody = z.object({
   email: z.string().email().max(200),
@@ -15,8 +16,12 @@ const setupBody = z.object({
   password: z.string().max(512),
 });
 
+/**
+ * People with an account. The single sign-on break-glass account (Q57) is not one: the appliance
+ * may provision it before anyone has signed in, and that must not close first-run setup.
+ */
 export async function userCount(app: FastifyInstance): Promise<number> {
-  const [row] = await app.db.select({ n: count() }).from(users);
+  const [row] = await app.db.select({ n: count() }).from(users).where(ne(users.email, BREAKGLASS_EMAIL));
   return row?.n ?? 0;
 }
 
@@ -31,6 +36,9 @@ export async function setupRoutes(app: FastifyInstance) {
     { config: { auth: false, csrf: false, rateLimit: { max: 5, timeWindow: "1 minute" } } },
     async (req, reply) => {
       const body = setupBody.parse(req.body);
+      // Setup mints a local password, which oidc_only could never use; the first admin there
+      // arrives through the identity provider (or break-glass).
+      if (app.vibeAuth.mode === "oidc_only") throw forbidden("Local sign-in is turned off for this installation. Sign in with single sign-on.");
       const reason = checkPasswordPolicy(body.password);
       if (reason) throw badRequest(reason);
       const passwordHash = await hashPassword(body.password);
@@ -38,7 +46,7 @@ export async function setupRoutes(app: FastifyInstance) {
       const created = await app.db.transaction(async (tx) => {
         // Serialize concurrent setup attempts; only the first wins.
         await tx.execute(sql`select pg_advisory_xact_lock(4242)`);
-        const [row] = await tx.select({ n: count() }).from(users);
+        const [row] = await tx.select({ n: count() }).from(users).where(ne(users.email, BREAKGLASS_EMAIL));
         if ((row?.n ?? 0) > 0) return null;
         const [u] = await tx
           .insert(users)

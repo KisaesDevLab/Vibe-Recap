@@ -3,6 +3,7 @@ import {
   bigserial,
   boolean,
   index,
+  unique,
   uniqueIndex,
   integer,
   jsonb,
@@ -27,6 +28,13 @@ export const users = pgTable("users", {
   lockedUntil: timestamp("locked_until", { withTimezone: true }),
   lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
   mustChangePassword: boolean("must_change_password").notNull().default(false),
+  /**
+   * True for an account created by single sign-on that has never been given a local password
+   * by an administrator (Q57). Such an account cannot use "Forgot your password?": whoever reads
+   * its mailbox would otherwise mint local credentials for a person whose factors live at the
+   * identity provider. An admin setting a password or sending a reset link clears it.
+   */
+  ssoOnly: boolean("sso_only").notNull().default(false),
   /** Narration voice for recaps this user uploads; null falls back to the firm-wide setting. */
   voice: text("voice"),
   totpSecret: text("totp_secret"),
@@ -47,8 +55,14 @@ export const sessions = pgTable(
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     ip: text("ip"),
     userAgent: text("user_agent"),
+    // Set only on a session that came from single sign-on (Q57). The ID token is kept wrapped
+    // with the master key, only to hand back to the identity provider at sign-out.
+    oidcIssuer: text("oidc_issuer"),
+    oidcSubject: text("oidc_subject"),
+    oidcSid: text("oidc_sid"),
+    oidcIdTokenWrapped: text("oidc_id_token_wrapped"),
   },
-  (t) => [index("sessions_user_idx").on(t.userId)],
+  (t) => [index("sessions_user_idx").on(t.userId), index("sessions_oidc_idx").on(t.oidcIssuer, t.oidcSubject)],
 );
 
 export const auditEvents = pgTable(
@@ -78,6 +92,47 @@ export const settings = pgTable("settings", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   updatedBy: uuid("updated_by"),
 });
+
+// ---------------------------------------------------------------------------
+// Single sign-on (Q57). These three tables belong to @kisaesdevlab/vibe-auth, which reads and
+// writes them with its own SQL (sql/auth_identities.sql in that package); they are declared
+// here so drizzle-kit owns the migration. user_id is text by that package's contract.
+// ---------------------------------------------------------------------------
+
+export const authIdentities = pgTable(
+  "auth_identities",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    userId: text("user_id").notNull(),
+    issuer: text("issuer").notNull(),
+    subject: text("subject").notNull(),
+    email: text("email"),
+    emailVerified: boolean("email_verified").notNull().default(false),
+    lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    unique("auth_identities_issuer_subject_uq").on(t.issuer, t.subject),
+    index("auth_identities_user_id_idx").on(t.userId),
+  ],
+);
+
+export const authSettings = pgTable("auth_settings", {
+  key: text("key").primaryKey(),
+  value: jsonb("value").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Unused by Recap (sessions are server-side rows), but the package writes it on back-channel logout. */
+export const authRevocations = pgTable(
+  "auth_revocations",
+  {
+    subjectKey: text("subject_key").primaryKey(),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }).notNull().defaultNow(),
+    revokedUntil: timestamp("revoked_until", { withTimezone: true }).notNull(),
+  },
+  (t) => [index("auth_revocations_until_idx").on(t.revokedUntil)],
+);
 
 export type User = typeof users.$inferSelect;
 export type Session = typeof sessions.$inferSelect;
