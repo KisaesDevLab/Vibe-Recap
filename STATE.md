@@ -136,7 +136,10 @@ total tax (verifier now feeds back into the retry loop), and the "tax year exact
 
 ## Single sign-on through Vibe Auth (2026-09-20)
 
-Branch `vibe-auth-integration`, not merged, not released. Q57 to Q60; operator notes in `docs/sso.md`.
+Merged to `main` 2026-09-20 on Kurt's instruction (Q61), not tagged. Q57 to Q61; operator notes in `docs/sso.md`.
+Kurt's Q&A the same day confirmed the four open choices as built: the package stays restricted,
+break-glass is password-only until TOTP exists, `vibe-partner` maps to admin, and *Sign out* ends the
+Recap session only.
 
 - The api embeds `@kisaesdevlab/vibe-auth` 1.0.5 and serves `/auth/*` (`src/lib/vibeAuth.ts`,
   registered right after the auth plugin). Modes `local` (default) / `both` / `oidc_only`. A
