@@ -101,6 +101,9 @@ total tax (verifier now feeds back into the retry loop), and the "tax year exact
 ## Releases
 
 - v0.1.0 (2026-09-05): first release, all nine phases.
+- v0.4.0 (2026-09-22): optional single sign-on through Vibe Auth (Q57 to Q62), verified in a real
+  browser against a real authentik; `scripts/sso-browser-check.py`; the appliance manifest gains
+  the `sso` block and the `/auth/*` matcher.
 - v0.3.0 (2026-09-11): purge a single job from its own page (Q53); re-render one job in another
   voice, 16 English Kokoro voices instead of 4, and a warning when a video is older than the script
   beside it (Q54-Q56).
@@ -136,7 +139,7 @@ total tax (verifier now feeds back into the retry loop), and the "tax year exact
 
 ## Single sign-on through Vibe Auth (2026-09-20)
 
-Merged to `main` 2026-09-20 on Kurt's instruction (Q61), not tagged. Q57 to Q61; operator notes in `docs/sso.md`.
+Merged to `main` 2026-09-20 on Kurt's instruction (Q61); released as v0.4.0 on 2026-09-22 after the real-browser check below. Q57 to Q62; operator notes in `docs/sso.md`.
 Kurt's Q&A the same day confirmed the four open choices as built: the package stays restricted,
 break-glass is password-only until TOTP exists, `vibe-partner` maps to admin, and *Sign out* ends the
 Recap session only.
@@ -161,13 +164,26 @@ Recap session only.
   provider), web typecheck and tests, the api image builds with the token as a BuildKit secret and
   carries none of it, `breakglass status --json` runs inside that image from the entrypoint's
   working directory.
-- **Not verified**: a real browser against a real authentik (the first real test of
-  `SameSite=Strict` across the redirect back); anything on the appliance. The Vibe-Appliance
-  vendored manifest is deliberately untouched: it must change only after an image with single
-  sign-on is released (checklist in `docs/sso.md`).
-- **Needs Kurt** (Q60): give this repository access to the `vibe-auth` package or CI fails at
-  `npm ci`; decide whether the package goes public, since the public repo no longer builds without
-  a token. Building locally: `NODE_AUTH_TOKEN=$(gh auth token) docker compose build`.
+- **Verified 2026-09-22 in a real browser against a real authentik**: the dev box's
+  `vibe-auth-test` stack (authentik 2026.8.2 behind the broker on `localhost:18080`), Recap on
+  `https://localhost` built from `main`, registered by hand as in `docs/sso.md`.
+  `scripts/sso-browser-check.py` drives headless Chromium through the *Sign in with …* button,
+  authentik's password, TOTP-enrolment and TOTP-validation stages and the redirect back: 14/14.
+  `recap_sid` (SameSite=Strict, HttpOnly, Secure) survives the cross-site hop from
+  `http://localhost:18080` to `https://localhost`, the SPA's `/api/auth/me` sees the account created
+  on first sign-in (`vibe-manager` → preparer, `sso_only` set, one `auth_identities` row),
+  `/auth/oidc/logout?local=1` ends the Recap session only, and a second sign-in links the same
+  account. Audited as `vibe.auth.user.provisioned`, `vibe.auth.login.success`, `vibe.auth.logout`.
+  Two things bit on the way and are now in `docs/sso.md`: authentik refuses a TOTP code reused
+  inside its 30 s window, and a Vibe Auth stack has its own service called `postgres`, so an api
+  container joined to that network must name Recap's database by container name.
+- **Not yet exercised**: anything on an appliance (`vibe identity register vibe-recap`, the
+  break-glass provisioning through the console). The vendored manifest and env template in
+  `Vibe-Appliance` were synced from `.appliance/` on 2026-09-22 (branch `feat/vibe-recap-sso`),
+  which is step 2 of the checklist in `docs/sso.md`; steps 3 and 4 run on the box.
+- Q60 is settled: the `Vibe-Recap` repository can read the package (the publish run of
+  2026-09-21 passed `npm ci`), and the package stays restricted. Building locally:
+  `NODE_AUTH_TOKEN=$(gh auth token) docker compose build`.
 - Dev box: Vibe-1099's test containers hold ports 55432/56379; run Recap's tests against other
   ports with `TEST_DATABASE_URL` / `TEST_REDIS_URL`.
 

@@ -4,8 +4,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Operational notes for Claude Code working in this repo. Read this first, then `docs/PLAN.md`, then `docs/PHASES.md`, then `STATE.md`.
 
-> **Current state (2026-09-20):** all nine phases built and verified; v0.3.0 tagged (v0.1.0 was the first release);
-> optional single sign-on through Vibe Auth merged after it, untagged, not yet tried against a real authentik (Q57 to Q61). Source is
+> **Current state (2026-09-22):** all nine phases built and verified; v0.4.0 tagged (v0.1.0 was the first release);
+> it adds optional single sign-on through Vibe Auth (Q57 to Q62), verified in a real browser against a real authentik on the dev box, not yet registered on an appliance. Source is
 > public at `github.com/KisaesDevLab/Vibe-Recap`; images publish to GHCR from `.github/workflows/publish.yml`
 > on every push to `main` (`latest`, `sha-*`) and on `v*.*.*` tags. Read `STATE.md` for what changed after
 > the plan and `QUESTIONS.md` for every decision taken along the way.

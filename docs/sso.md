@@ -186,6 +186,12 @@ that to arrive, authentik must be able to reach the api container: on the applia
 `baseUrl` it can reach and drop `internalUrl`. A lost back-channel call is not retried: the
 session then lives until it expires (12 h idle, 7 days absolute) or the user signs out.
 
+If you join the api container to a Vibe Auth network by hand (a compose override adding the
+network to `api`), name Recap's database and Redis by container name in `DATABASE_URL` and
+`REDIS_URL` for that container: the Vibe Auth stack has its own service called `postgres`, and
+Docker's DNS answers for whichever network it likes, so the api can start against the wrong
+database with a password error and nothing else to go on.
+
 *Sign out* in Recap ends the Recap session only; the person stays signed in to the identity
 provider and the other Vibe apps.
 
@@ -236,10 +242,23 @@ cases: modes, first sign-in with a mapped role, email link and role sync, the re
 last-admin floor, the reset refusal, back-channel and both sign-outs, `oidc_only` with
 break-glass, the boot refusal, and the Settings › Users guards.
 
-**Not yet exercised**: a real browser against a real authentik. That is the first real test of
-`SameSite=Strict` across the redirect back from the identity provider. The reasoning says it
-holds, since the callback *sets* the cookie and nothing needs to *send* one until the SPA's
-same-origin `/api/auth/me`, but it has not been watched.
+**Real browser, real authentik** (`scripts/sso-browser-check.py`, run 2026-09-22 against the
+Vibe Auth test stack on the dev box, 14/14): headless Chromium clicks *Sign in with …*, answers
+authentik's password, TOTP-enrolment and TOTP-validation stages, and the redirect back to
+`/auth/oidc/callback` is a top-level navigation from the authentik origin, as in authentik's own
+UI. `recap_sid` (SameSite=Strict) survives that cross-site hop because the callback *sets* the
+cookie and the first request that must *send* it is the SPA's same-origin `/api/auth/me`. The
+check also covers the account created on first sign-in, the role map, `/auth/oidc/logout?local=1`
+and a second sign-in linking the same account. Run it with a Recap in mode `both`, a registration
+block in `.env`, and an authentik user with a password and no enrolled device:
+
+```bash
+SSO_PASSWORD='...' worker/.venv/Scripts/python scripts/sso-browser-check.py
+```
+
+Two things to know when reproducing it: authentik refuses a TOTP code reused inside its 30 s
+window (the check waits for a fresh one between enrolment and validation), and the Vibe Auth
+stack has a service called `postgres`, see *Networks* above.
 
 ## Deviations from `Vibe-Auth/docs/integration-plans/vibe-recap.md`
 
