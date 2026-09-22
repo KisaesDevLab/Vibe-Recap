@@ -101,6 +101,8 @@ total tax (verifier now feeds back into the retry loop), and the "tax year exact
 ## Releases
 
 - v0.1.0 (2026-09-05): first release, all nine phases.
+- v0.4.1 (2026-09-22): Kurt's answers to Q62 to Q65 recorded; `VIBE_OIDC_REQUIRE_MFA_AMR` shown in
+  `.env.example`; the appliance manifest sync (Vibe-Appliance PR #13) merged.
 - v0.4.0 (2026-09-22): optional single sign-on through Vibe Auth (Q57 to Q62), verified in a real
   browser against a real authentik; `scripts/sso-browser-check.py`; the appliance manifest gains
   the `sso` block and the `/auth/*` matcher.
