@@ -29,13 +29,19 @@ def from_comparison_page(pages: list[PageInfo], profile: dict[str, Any], tax_yea
 
     orphan_tol = float(profile.get("geometry", {}).get("orphan_y_tolerance", 0))
 
-    def header_x(page: PageInfo) -> float | None:
-        # The column header is a short row ("2024 2025 Differences"); a report title that happens to
-        # name both years ("Two Year Comparison Report - Page 1 2024 & 2025") is not it.
+    def header_cols(page: PageInfo) -> tuple[float, float] | None:
+        """x-centres of the prior-year and current-year column headers.
+
+        The column header is a short row ("2024 2025 Differences"); a report title that happens to
+        name both years ("Two Year Comparison Report - Page 1 2024 & 2025") is not it.
+        """
         for ln in page.lines:
             years = [w for w in ln.words if w.text in (prior_year, str(tax_year))]
             if len(years) >= 2 and len(ln.words) <= 4:
-                return next(w.xc for w in years if w.text == prior_year)
+                prior_w = next((w for w in years if w.text == prior_year), None)
+                cur_w = next((w for w in years if w.text == str(tax_year)), None)
+                if prior_w and cur_w:
+                    return prior_w.xc, cur_w.xc
         return None
 
     def row_amounts(page: PageInfo, ln: Line) -> list[Word]:
@@ -54,7 +60,7 @@ def from_comparison_page(pages: list[PageInfo], profile: dict[str, Any], tax_yea
     # The federal comparison can run to two pages (income and AGI on the first, tax, payments and
     # the result on the second). Only directly consecutive comparison pages join the first one, so
     # a state or Schedule C comparison printed later in the package never supplies a federal figure.
-    start = next((i for i, p in enumerate(pages) if p.kind == "comparison" and header_x(p) is not None), None)
+    start = next((i for i, p in enumerate(pages) if p.kind == "comparison" and header_cols(p) is not None), None)
     if start is None:
         return dict(EMPTY)
     group: list[PageInfo] = [pages[start]]
@@ -63,18 +69,19 @@ def from_comparison_page(pages: list[PageInfo], profile: dict[str, Any], tax_yea
             group.append(p)
         else:
             break
-    col_x = header_x(group[0])
+    cols = header_cols(group[0])
     out: dict[str, Any] = dict(EMPTY)
     out["present"] = True
     signed_net: int | None = None
+    applied = 0
     for spec in rows:
-        if spec["path"] not in EMPTY and not spec.get("signed"):
+        if spec["path"] not in EMPTY and spec["path"] != "applied" and not spec.get("signed"):
             continue
         if spec.get("signed") and signed_net is not None:
             continue  # an earlier, preferred signed row already answered
         found = False
         for page in group:
-            page_col = header_x(page) or col_x
+            prior_x, cur_x = header_cols(page) or cols  # type: ignore[misc]
             for ln in page.lines:
                 label = " ".join(w.text for w in ln.words if not looks_like_amount(w.text) or LINE_NO_RE.match(w.text))
                 label = re.sub(r"^\s*\d{1,2}[a-z]?\.?\s*", "", label)  # "30. Adjusted gross income 30." -> label text
@@ -83,11 +90,18 @@ def from_comparison_page(pages: list[PageInfo], profile: dict[str, Any], tax_yea
                 amounts = row_amounts(page, ln)
                 if not amounts:
                     continue
-                nearest = min(amounts, key=lambda w: abs(w.xc - page_col))
+                nearest = min(amounts, key=lambda w: abs(w.xc - prior_x))
+                if abs(nearest.xc - prior_x) >= abs(nearest.xc - cur_x):
+                    # The prior-year cell is blank (a report leaves zeros empty); the nearest amount
+                    # is the current year's and must not stand in for it.
+                    found = True
+                    break
                 v = parse_amount(nearest.text)
                 if v is not None:
                     if spec.get("signed"):
                         signed_net = v
+                    elif spec["path"] == "applied":
+                        applied = abs(v)
                     else:
                         # "Refund received" rows are sometimes printed negative; the schema keeps magnitudes.
                         out[spec["path"]] = abs(v) if spec["path"] in ("refund", "amount_owed") else v
@@ -99,5 +113,6 @@ def from_comparison_page(pages: list[PageInfo], profile: dict[str, Any], tax_yea
         if signed_net > 0:
             out["amount_owed"] = signed_net
         elif signed_net < 0:
-            out["refund"] = -signed_net
+            # An overpayment applied to next year's estimates was not refunded.
+            out["refund"] = max(0, -signed_net - applied)
     return out

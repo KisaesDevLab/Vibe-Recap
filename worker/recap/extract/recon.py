@@ -72,6 +72,11 @@ def reconcile(doc: dict[str, Any], exceptions: set[str] | None = None) -> dict[s
                 with_penalty["penalty_included"] = g(st, "penalty")
                 row = with_penalty
         checks.append(row)
+        # A state read as all zeros foots trivially (0 - 0 = 0 - 0), so the check above cannot
+        # catch a form whose lines were never found. Fail it; a preparer can downgrade it with a
+        # reason for a genuinely zero state return.
+        figures = sum(abs(g(st, k)) for k in ("tax", "payments", "refund", "amount_owed"))
+        checks.append(_check(f"state_{code}_figures_found", 1, 1 if figures else 0, ex))
     passed = all(c["ok"] or c.get("warning") for c in checks)
     return {"passed": passed, "checks": checks}
 

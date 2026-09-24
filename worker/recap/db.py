@@ -64,6 +64,16 @@ class Db:
                 "delete from files where job_id = %s and kind = any(%s) returning *", (job_id, kinds)
             ).fetchall()
 
+    # -- extraction overrides (Q66) --------------------------------------------
+    def active_overrides(self, job_id: str) -> list[dict[str, Any]]:
+        """The job's current preparer overrides, oldest first: id, path, value."""
+        with self.conn() as c:
+            rows = c.execute(
+                "select id, path, value from extraction_overrides where job_id = %s and removed_at is null and value is not null order by created_at",
+                (job_id,),
+            ).fetchall()
+        return [{"id": str(r["id"]), "path": r["path"], "value": int(r["value"])} for r in rows]
+
     # -- revision requests (chat-style change instructions for the script) ---
     def pending_revision(self, job_id: str) -> dict[str, Any] | None:
         with self.conn() as c:

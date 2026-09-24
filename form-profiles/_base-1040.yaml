@@ -71,7 +71,8 @@ lines:
   - { path: payments.refundable_credits, page: f1040_2, line: '32', label: 'refundable credits|total other payments' }
   - { path: payments.total_payments, page: f1040_2, line: '33', label: 'total payments' }
   - { path: result.refund, page: f1040_2, line: '35a', label: 'refunded to you' }
-  - { path: result.applied_to_next_year, page: f1040_2, line: '36', label: 'applied to your .* estimated tax' }
+  # Line 36 sits in the inner column like line 38 (UltraTax prints it at x~434), hence its own value zone.
+  - { path: result.applied_to_next_year, page: f1040_2, line: '36', label: 'applied to your .* estimated tax', value_min_x: 380 }
   - { path: result.amount_owed, page: f1040_2, line: '37', label: 'amount you owe' }
   # Line 38 is printed in the smaller box left of the main amount column, hence its own value zone.
   - { path: extras.estimated_tax_penalty, page: f1040_2, line: '38', label: 'Estimated tax penalty', required: false, value_min_x: 380 }
@@ -89,6 +90,26 @@ state:
     - { path: amount_owed, label: 'amount due|amount you owe|balance due|tax due' }
     # Folded into the amount due on most state forms, like federal line 38; lets the state result foot.
     - { path: penalty, label: 'underpayment of estimated tax penalty|estimated tax penalty|penalty and interest' }
+  # Per-state line labels, tried in order before the generic patterns above, for the figures the
+  # narration uses. A state listed here never falls back to a generic pattern for that figure: a
+  # blank line on its own form is zero, not a cue to take the first "refund" row elsewhere in the
+  # package (MO-A line 9 is a state refund included in federal AGI). Taken from the 2025 forms.
+  # A lone "-" is dropped as leader punctuation, so the patterns allow any separator (\W+).
+  by_state:
+    MO:  # MO-1040
+      tax: ['^Total Tax\W+Add Lines']
+      payments: ['^Total payments and credits']
+      refund: ['^REFUND\W+Subtract']
+      amount_owed: ['^AMOUNT DUE\W+Add']
+      penalty: ['^Underpayment of estimated tax penalty']
+    AR:  # AR1000F (resident) and AR1000NR (nonresident / part-year)
+      # AR1000NR line 38D apportions line 38 to Arkansas; a resident's liability is line 38.
+      tax: ['APPORTIONED TAX LIABILITY', '^NET TAX: \(Subtract line 37']
+      payments: ['^TOTAL PAYMENTS: \(Add lines']
+      refund: ['^AMOUNT TO BE REFUNDED TO YOU']
+      # Line 52C is the amount due with the estimated tax penalty (52B), line 51 without it.
+      amount_owed: ['^Add lines 51 and 52B', '^AMOUNT DUE: \(If line']
+      penalty: ['^UEP: Attach Form AR2210']
 
 # Two-year comparison rows. Reports list several "taxable income" and "refund" rows; the patterns
 # pick the final ones. Values are taken from the prior-year column.
@@ -99,6 +120,8 @@ comparison:
     - { path: total_tax, label: 'total tax(?! from)' }
     - { path: refund, label: 'refund received|^refund\b(?! applied)|\brefund$' }
     - { path: amount_owed, label: 'amount owed|balance due|amount due|amount you owe|\btax due$' }
+    # Read only to net the signed row below: an overpayment applied to estimates was not refunded.
+    - { path: applied, label: 'refund applied|applied to (next year|estimated)' }
     # Some reports print one signed row instead: positive is a balance due, negative a refund.
     # Used only when neither of the rows above carried a value; the "net" row (after penalty, the
     # figure that matches line 37) is preferred over the bare "tax due" row.

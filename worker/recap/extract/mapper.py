@@ -137,6 +137,38 @@ def _prefix_index(label_words: list[Word]) -> int | None:
     return None
 
 
+PAIRED_NO_MIN_X = 340.0  # repeated line numbers sit beside an amount column: x~478 (main), x~363 (inner)
+INNER_AMOUNT_MIN_X = 250.0  # left edge of the leftmost inner amount column (Form 1040 2a-6a, x~272)
+
+
+def _paired_number(label_words: list[Word]) -> str | None:
+    """The line number printed beside the amount column, when the row ends with one.
+
+    Form 1040 pairs lines on one row: "3a Qualified dividends 3a  b Ordinary dividends 3b". The
+    prefix names the first line (3a), but the main-column amount belongs to the line whose number
+    is printed last, just left of the amount column (3b). Keying the row by that number is what
+    lets 2b, 3b, 4b, 5b and 6b match at all; a row whose last number repeats its prefix is unchanged.
+    """
+    if not label_words:
+        return None
+    w = label_words[-1]
+    if w.x0 >= PAIRED_NO_MIN_X and LINE_NO_RE.match(w.text):
+        return w.text.rstrip(".")
+    return None
+
+
+def _row_key(number: str | None, label_words: list[Word]) -> str | None:
+    """The line a row's main amount belongs to: the paired number when it is the same line with
+    another letter (prefix 3a, paired 3b) or the row has no prefix, else the prefix. A checkbox
+    list ending in a bare digit ("Form(s): 1 8814 2 4972 3" on line 16) never renames a row."""
+    paired = _paired_number(label_words)
+    if not paired:
+        return number
+    if number is None or re.sub(r"[a-z]$", "", paired.lower()) == re.sub(r"[a-z]$", "", number.lower()):
+        return paired
+    return number
+
+
 def _value_for(amounts: list[Word]) -> Word | None:
     return max(amounts, key=lambda w: w.x1) if amounts else None
 
@@ -151,6 +183,7 @@ def find_row(page: PageInfo, spec: dict[str, Any], geometry: dict[str, Any]) -> 
     label_re = spec.get("label")
     for ln in page.lines:
         number, label_words, amounts = _row_number(ln, position, min_x)
+        number = _row_key(number, label_words)
         label = " ".join(w.text for w in label_words)
         if want_nos:
             if (number or "").lower() not in want_nos:
@@ -181,15 +214,22 @@ def _value_row(other: Line, position: str, min_x: float, number: str | None) -> 
     the row names a line number it must be the one being looked up, so a neighbouring line's
     value is never borrowed.
     """
-    row_no, label_words, amounts = _row_number(other, position, min_x)
-    if not amounts or any(w.x1 >= MARGIN_MAX_X for w in label_words):
+    # A lone "00" is a state form's cents column: neither the value nor a line number (see _row_number).
+    words = [w for w in other.words if not PUNCT_RE.match(w.text) and w.text != "00"]
+    amounts = [w for w in words if w.x1 >= min_x and looks_like_amount(w.text)]
+    rest = [w for w in words if w not in amounts]
+    # Amounts left of the value zone belong to an inner column on the same row (UltraTax prints
+    # line 3a qualified dividends beside line 3b's value), so they do not make the row a label,
+    # and a short one ("3") is an amount there, not a line number.
+    if not amounts or any(w.x1 >= MARGIN_MAX_X and not looks_like_amount(w.text) for w in rest):
         return None
-    if row_no is not None:
-        num_word = next((w for w in other.words if w.text.rstrip(".").lower() == row_no.lower()), None)
-        if num_word is None or num_word.x0 < 400:
-            return None
-        if number is not None and row_no.lower() != number.lower():
-            return None
+    # ...but a line number where line numbers print (the label column, or written "33.") makes it
+    # a labelled row: AR1000NR's "33. =>" row carries line 33's amount, not the next line's.
+    if any(w.x1 >= MARGIN_MAX_X and LINE_NO_RE.match(w.text) and (w.x0 < INNER_AMOUNT_MIN_X or w.text.endswith(".")) for w in rest):
+        return None
+    repeated = {w.text.rstrip(".").lower() for w in rest if w.x0 >= 400 and LINE_NO_RE.match(w.text)}
+    if repeated and number is not None and number.lower() not in repeated:
+        return None
     return _value_for(amounts)
 
 
@@ -359,26 +399,58 @@ def detect_states(pages: list[PageInfo], profile: dict[str, Any], profiles_dir: 
                 continue
         current = None
     out: list[dict[str, Any]] = []
+    by_state = profile.get("state", {}).get("by_state", {}) or {}
+    nonresident: set[str] = set()
     for code, group in groups.items():
         row: dict[str, Any] = {"code": code, "taxable_income": 0, "tax": 0, "payments": 0, "refund": 0, "amount_owed": 0}
         for spec in profile.get("state", {}).get("lines", []):
-            for page in group:
-                f = find_row(page, {"label": spec["label"]}, geometry)
-                if f:
-                    row[spec["path"]] = f.value
+            # The state's own form labels first, in order; a state with its own labels for a
+            # figure never falls back to the generic pattern (a blank line there means zero).
+            patterns = by_state.get(code, {}).get(spec["path"]) or [spec["label"]]
+            found = None
+            for pat in patterns:
+                found = next((f for page in group if (f := find_row(page, {"label": pat}, geometry))), None)
+                if found:
                     break
+            if found:
+                row[spec["path"]] = found.value
         if not row.get("penalty"):
             row.pop("penalty", None)  # only present when the form prints one
+        if any(re.search(r"\bnon-?resident\b|\bpart-?year\b", "\n".join(ln.text for ln in p.lines[:12]), re.I) for p in group):
+            nonresident.add(code)
         out.append(row)
+    # The narration treats the first state as the resident state, so a nonresident or part-year
+    # return (AR1000NR beside a Missouri resident return) never leads, whatever the page order.
+    out.sort(key=lambda r: r["code"] in nonresident)
     return out
 
 
-def extract_document(pdf: Any, profile: dict[str, Any], profiles_dir: str) -> tuple[dict[str, Any], list[PageInfo], Mapped]:
-    """Run the mapper over an open pdfplumber document. Returns (partial extraction, pages, mapping)."""
+def evidence_of(mapped: Mapped) -> dict[str, list[dict[str, Any]]]:
+    """Where on the PDF each figure was read: page, IRS line number, and the form's line label.
+
+    Form text only, no amounts; kept in the extraction so the override log (Q66) can say which
+    profile rule misread which row.
+    """
+    out: dict[str, list[dict[str, Any]]] = {}
+    for key, f in mapped.evidence.items():
+        path = key.split("@", 1)[0]
+        out.setdefault(path, []).append({"page": f.page, "line": f.line_no, "label": f.label[:120], "y": round(f.y, 1)})
+    return out
+
+
+def extract_document(
+    pdf: Any, profile: dict[str, Any], profiles_dir: str, supplied: set[str] | None = None
+) -> tuple[dict[str, Any], list[PageInfo], Mapped]:
+    """Run the mapper over an open pdfplumber document. Returns (partial extraction, pages, mapping).
+
+    `supplied` names paths a preparer override provides (Q66); a required line the mapper could
+    not find is not an error when an override supplies it.
+    """
     pages = read_pages(pdf, profile)
     mapped = map_lines(pages, profile)
-    if mapped.missing:
-        raise ExtractionError("required lines missing: " + ", ".join(mapped.missing))
+    missing = [m for m in mapped.missing if m.split(" ", 1)[0] not in (supplied or set())]
+    if missing:
+        raise ExtractionError("required lines missing: " + ", ".join(missing))
     p1 = next((p for p in pages if p.kind == "f1040_1"), None)
     if not p1:
         raise ExtractionError("Form 1040 page 1 not found")
@@ -401,6 +473,7 @@ def extract_document(pdf: Any, profile: dict[str, Any], profiles_dir: str) -> tu
         "result": v.get("result", {}),
         "state": detect_states(pages, profile, profiles_dir),
         "_extras": {**extras, "has_form_2210": any(p.kind == "form_2210" for p in pages)},
+        "evidence": evidence_of(mapped),
     }
     doc["meta"]["state_returns"] = [s["code"] for s in doc["state"]]
     return doc, pages, mapped

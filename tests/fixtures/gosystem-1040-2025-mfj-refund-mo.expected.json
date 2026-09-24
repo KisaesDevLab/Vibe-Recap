@@ -136,6 +136,12 @@
         "expected": 590,
         "actual": 590,
         "ok": true
+      },
+      {
+        "name": "state_MO_figures_found",
+        "expected": 1,
+        "actual": 1,
+        "ok": true
       }
     ]
   }

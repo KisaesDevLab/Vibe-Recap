@@ -191,6 +191,7 @@ def expected_json(case: Case, software: str) -> dict:
     states = [state_result(s) for s in case.states]
     for s in states:
         recon_checks.append({"name": f"state_{s['code']}_result_foots", "expected": s["refund"] - s["amount_owed"], "actual": s["refund"] - s["amount_owed"], "ok": True})
+        recon_checks.append({"name": f"state_{s['code']}_figures_found", "expected": 1, "actual": 1, "ok": True})
     # The PDF alone only reveals prior-year figures when a comparison page is printed.
     py = case.prior_year if (case.prior_year and case.comparison_page) else {}
     return {
@@ -668,6 +669,19 @@ def draw_state(L: Layout, case: Case, st: dict, page: int, total: int):
         ("30", "Overpayment / Refund", res["refund"]),
         ("33", "Amount due", res["amount_owed"]),
     ]
+    if code == "MO":
+        # The real MO-1040 line labels, which the profile's per-state rules (by_state) look for.
+        rows = [
+            ("1", "Federal adjusted gross income from federal return", case.agi),
+            ("29", "Taxable income - Subtract Line 28 from Line 27", res["taxable_income"]),
+            ("36", "Total Tax - Add Lines 35Y and 35S", res["tax"]),
+            ("37", "MISSOURI tax withheld - Attach Forms W-2 and 1099", st["withholding"]),
+            ("38", f"{case.tax_year} Missouri estimated tax payments", st.get("estimates", 0)),
+            ("45", "Total payments and credits - Add Lines 37 through 44", res["payments"]),
+            ("49", "Amount of OVERPAYMENT", res["refund"]),
+            ("53", "REFUND - Subtract Lines 50, 51, and 52 from Line 49", res["refund"]),
+            ("56", "AMOUNT DUE - Add Lines 54 and 55", res["amount_owed"]),
+        ]
     for num, text, amt in rows:
         L.line(y, num, text, amt)
         y -= L.line_h

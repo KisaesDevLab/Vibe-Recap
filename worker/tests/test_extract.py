@@ -23,6 +23,8 @@ def strip_volatile(doc: dict) -> dict:
     d["meta"].pop("profile", None)
     d["prior_year"].pop("source", None)
     d.pop("extras", None)  # penalty / Schedule A total / 2210 presence: checked by their own tests
+    d.pop("evidence", None)  # row positions: checked by test_overrides
+    d.pop("overrides", None)
     return d
 
 

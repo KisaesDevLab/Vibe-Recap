@@ -16,7 +16,7 @@ def compute_observations(doc: dict[str, Any]) -> list[dict[str, Any]]:
     obs: list[dict[str, Any]] = []
     py = doc.get("prior_year") or {}
     adj, tax, pay, res, ded = (doc.get(k, {}) for k in ("adjustments", "tax", "payments", "result", "deductions"))
-    extras = doc.get("_extras", {})
+    extras = doc.get("extras") or doc.get("_extras") or {}
     if py.get("present"):
         d = int(adj.get("agi", 0)) - int(py.get("agi", 0))
         obs.append({"id": "yoy_agi", "delta": d, "pct": _pct(d, int(py.get("agi", 0)))})

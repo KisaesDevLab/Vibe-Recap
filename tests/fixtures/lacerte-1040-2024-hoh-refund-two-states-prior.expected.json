@@ -132,9 +132,21 @@
         "ok": true
       },
       {
+        "name": "state_KS_figures_found",
+        "expected": 1,
+        "actual": 1,
+        "ok": true
+      },
+      {
         "name": "state_MO_result_foots",
         "expected": -120,
         "actual": -120,
+        "ok": true
+      },
+      {
+        "name": "state_MO_figures_found",
+        "expected": 1,
+        "actual": 1,
         "ok": true
       }
     ]

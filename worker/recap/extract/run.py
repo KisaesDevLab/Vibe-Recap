@@ -9,6 +9,7 @@ import pdfplumber
 from .identify import Identification, identify
 from .mapper import ExtractionError, extract_document
 from .observations import compute_observations
+from .overrides import apply_overrides
 from .prior import EMPTY, from_comparison_page, from_extraction
 from .profiles import load_profile
 from .recon import reconcile
@@ -25,6 +26,7 @@ def extract_return(
     ident: Identification | None = None,
     prior_pdf_path: str | None = None,
     recon_exceptions: set[str] | None = None,
+    overrides: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     ident = ident or identify(pdf_path, profiles_dir)
     form = ident.form or "1040"
@@ -32,7 +34,7 @@ def extract_return(
         raise ExtractionError(f"unsupported form {form}; v1 handles Form 1040 packages only")
     profile = load_profile(profiles_dir, "1040", ident.tax_year, ident.software)
     with pdfplumber.open(pdf_path) as pdf:
-        doc, pages, _mapped = extract_document(pdf, profile, profiles_dir)
+        doc, pages, _mapped = extract_document(pdf, profile, profiles_dir, supplied={str(o.get("path")) for o in overrides or []})
     doc["meta"] = {
         "software": ident.software,
         "tax_year": ident.tax_year,
@@ -41,7 +43,9 @@ def extract_return(
         "state_returns": doc["meta"]["state_returns"],
         "profile": profile.get("_file"),
     }
-    doc["tax"]["effective_rate"] = _effective_rate(doc)
+    # Kept in the extraction so a later recon pass (the pipeline's recon step, a per-job exception)
+    # still knows about the penalty that line 37 folds into the amount owed.
+    doc["extras"] = doc.pop("_extras", {})
 
     prior = dict(EMPTY)
     if prior_pdf_path:
@@ -56,9 +60,9 @@ def extract_return(
         if prior["present"]:
             prior["source"] = "comparison_page"
     doc["prior_year"] = prior
+    # Preparer overrides (Q66) land before everything computed from the figures.
+    doc["overrides"] = apply_overrides(doc, overrides or [])
+    doc["tax"]["effective_rate"] = _effective_rate(doc)
     doc["observations"] = compute_observations(doc)
     doc["recon"] = reconcile(doc, recon_exceptions)
-    # Kept in the extraction so a later recon pass (the pipeline's recon step, a per-job exception)
-    # still knows about the penalty that line 37 folds into the amount owed.
-    doc["extras"] = doc.pop("_extras", {})
     return doc

@@ -178,6 +178,7 @@ def step_extract(ctx: Ctx) -> None:
             ident=ctx.ident,
             prior_pdf_path=str(ctx.prior_pdf) if ctx.prior_pdf else None,
             recon_exceptions=exceptions,
+            overrides=ctx.db.active_overrides(ctx.job_id),
         )
     except ExtractionError as exc:
         raise StepFailed("extract", str(exc)) from exc
