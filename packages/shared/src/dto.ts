@@ -226,6 +226,57 @@ export interface ExtractionDto {
   prior_year: { present: boolean; agi: number; total_tax: number; refund: number; amount_owed: number; source?: string };
   observations: ObservationDto[];
   recon: { passed: boolean; checks: ReconCheckDto[] };
+  /** Where on the PDF the mapper read each figure (form text only), keyed by path. */
+  evidence?: Record<string, OverrideEvidenceDto[]>;
+  /** Preparer overrides applied to this extraction (Q66), with the value the mapper read. */
+  overrides?: AppliedOverrideDto[];
+}
+
+export interface OverrideEvidenceDto {
+  page: number;
+  line: string | null;
+  label: string;
+  y?: number;
+}
+
+export interface AppliedOverrideDto {
+  id: string;
+  path: string;
+  extracted?: number | null;
+  value?: number;
+  /** The mapper now reads the same figure, so the override can be removed. */
+  matches_extracted?: boolean;
+  ignored?: boolean;
+}
+
+/** An active override on a job (Q66). */
+export interface ExtractionOverrideDto {
+  id: string;
+  path: string;
+  value: number | null;
+  extractedValue: number | null;
+  reason: string;
+  by: string;
+  at: string;
+}
+
+/** A row of the override log admins read to find profile rules that misread lines (Q66). */
+export interface ExtractionOverrideLogDto extends ExtractionOverrideDto {
+  jobId: string;
+  jobStatus: string | null;
+  software: string | null;
+  taxYear: number | null;
+  profile: string | null;
+  evidence: OverrideEvidenceDto[] | null;
+  removedAt: string | null;
+  removedBy: string | null;
+  valuesPurged: boolean;
+}
+
+export interface ExtractionOverrideLogResponse {
+  overrides: ExtractionOverrideLogDto[];
+  /** Counts by field over the listed period, most-overridden first. */
+  byPath: Array<{ path: string; count: number }>;
 }
 
 export interface ReconExceptionDto {
@@ -239,6 +290,7 @@ export interface ExtractionResponse {
   extraction: ExtractionDto | null;
   sha256: string | null;
   reconExceptions: ReconExceptionDto[];
+  overrides: ExtractionOverrideDto[];
 }
 
 // ---------------------------------------------------------------------------

@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  bigint,
   bigserial,
   boolean,
   index,
@@ -293,6 +294,51 @@ export const jobEvents = pgTable(
   (t) => [index("job_events_job_idx").on(t.jobId)],
 );
 
+/**
+ * Preparer overrides of extracted figures (Q66), and the log profile work reads. A row is active
+ * while `removed_at` is null; the worker applies active rows after the mapper and before recon.
+ * `extracted_value` is what the mapper read (null when it found nothing) and `evidence` says where
+ * on the PDF it read it (page, IRS line, form label), so the log shows which profile rule misread
+ * which row. Amounts are nulled when the job is purged (`values_purged_at`); the rest stays.
+ */
+export const extractionOverrides = pgTable(
+  "extraction_overrides",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    jobId: uuid("job_id")
+      .notNull()
+      .references(() => jobs.id, { onDelete: "cascade" }),
+    path: text("path").notNull(),
+    value: bigint("value", { mode: "number" }),
+    extractedValue: bigint("extracted_value", { mode: "number" }),
+    reason: text("reason").notNull(),
+    software: text("software"),
+    taxYear: integer("tax_year"),
+    profile: text("profile"),
+    evidence: jsonb("evidence").$type<OverrideEvidence[]>(),
+    createdBy: uuid("created_by").references(() => users.id),
+    createdByLabel: text("created_by_label").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    removedAt: timestamp("removed_at", { withTimezone: true }),
+    removedBy: uuid("removed_by"),
+    removedByLabel: text("removed_by_label"),
+    valuesPurgedAt: timestamp("values_purged_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("extraction_overrides_job_idx").on(t.jobId),
+    index("extraction_overrides_created_idx").on(t.createdAt),
+    uniqueIndex("extraction_overrides_active_uq").on(t.jobId, t.path).where(sql`${t.removedAt} is null`),
+  ],
+);
+
+export interface OverrideEvidence {
+  page: number;
+  line: string | null;
+  label: string;
+  y?: number;
+}
+
+export type ExtractionOverride = typeof extractionOverrides.$inferSelect;
 export type Client = typeof clients.$inferSelect;
 export type Batch = typeof batches.$inferSelect;
 export type Job = typeof jobs.$inferSelect;

@@ -14,7 +14,7 @@ import type { FastifyInstance, FastifyReply } from "fastify";
 import { and, desc, eq, gt, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import { FEEDBACK_HOLD_DAYS, FEEDBACK_REASON_CODES, type FeedbackAdminRowDto, type FeedbackDto, type FeedbackListDto, type JobStatus } from "@vibe-recap/shared";
-import { clients, files, jobEvents, jobFeedback, jobRevisions, jobs, type JobFeedback } from "../db/schema.js";
+import { clients, extractionOverrides, files, jobEvents, jobFeedback, jobRevisions, jobs, type JobFeedback } from "../db/schema.js";
 import { badRequest, notFound } from "../errors.js";
 import { actorOf, requireRole } from "../plugins/auth.js";
 import { audit } from "../services/audit.js";
@@ -203,6 +203,7 @@ export async function feedbackRoutes(app: FastifyInstance) {
     const allFeedback = await app.db.select().from(jobFeedback).where(eq(jobFeedback.jobId, job.id));
     const revisions = await app.db.select().from(jobRevisions).where(eq(jobRevisions.jobId, job.id)).orderBy(jobRevisions.createdAt);
     const jobFiles = await app.db.select().from(files).where(eq(files.jobId, job.id));
+    const overrides = await app.db.select().from(extractionOverrides).where(eq(extractionOverrides.jobId, job.id)).orderBy(extractionOverrides.createdAt);
     const manifest = {
       generatedAt: new Date().toISOString(),
       job: {
@@ -228,6 +229,8 @@ export async function feedbackRoutes(app: FastifyInstance) {
       events: events.map((e) => ({ at: e.at, status: e.status, step: e.step, message: e.message, meta: e.meta })),
       feedback: allFeedback.map(toFeedbackDto),
       revisions: revisions.map(toRevisionDto),
+      // Preparer overrides of extracted figures (Q66), active and removed: each marks a line the profile misread.
+      extractionOverrides: overrides.map((o) => ({ path: o.path, value: o.value, extractedValue: o.extractedValue, reason: o.reason, evidence: o.evidence, by: o.createdByLabel, at: o.createdAt, removedAt: o.removedAt })),
       files: jobFiles.map((f) => ({ kind: f.kind, seq: f.seq, sha256: f.sha256, size: f.size, purged: !!f.purgedAt })),
     };
     const wanted: Array<{ kind: string; name: string }> = [

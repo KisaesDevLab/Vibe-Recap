@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { Link } from "react-router";
-import { FEEDBACK_REASONS, type FeedbackListDto } from "@vibe-recap/shared";
+import { FEEDBACK_REASONS, overridePathLabel, type ExtractionOverrideLogResponse, type FeedbackListDto } from "@vibe-recap/shared";
 import { useApi } from "../lib/useApi";
 import { ApiError, post } from "../lib/api";
-import { fmtDate } from "../lib/format";
+import { fmtDate, fmtMoney } from "../lib/format";
 import { Alert, Badge, Button, Card, PageTitle, Spinner } from "../ui";
 import { StatusBadge } from "../components/JobTable";
 
@@ -170,6 +170,95 @@ export function SettingsQualityPage() {
           </Card>
         </div>
       )}
+      <OverrideLogCard days={days} />
     </>
+  );
+}
+
+/**
+ * Every preparer override of an extracted figure in the period (Q66). Each one marks a line a form
+ * profile misread; "read from" names the page, IRS line and label the profile used, and the counts
+ * by field show which rules to fix first. The CSV carries the same rows for profile work.
+ */
+function OverrideLogCard({ days }: { days: number }) {
+  const { data, loading, error } = useApi<ExtractionOverrideLogResponse>(`/api/extraction-overrides?days=${days}`);
+  return (
+    <Card
+      className="mt-4"
+      title="Overridden figures"
+      actions={
+        <a className="text-sm text-brand hover:underline" href={`/api/extraction-overrides?days=${days}&format=csv`}>
+          Download CSV
+        </a>
+      }
+    >
+      <p className="mb-3 text-xs text-slate-500">
+        A preparer overrode these figures because the form profile misread the line. Fix the profile rule named under “read from”, then the override on later returns reads
+        “the extraction now reads this figure”. Amounts are cleared when a job is purged; the field, line and reason stay.
+      </p>
+      {loading && !data ? (
+        <Spinner />
+      ) : error ? (
+        <Alert kind="error">{error}</Alert>
+      ) : !data || data.overrides.length === 0 ? (
+        <p className="text-sm text-slate-500">No overrides in this period.</p>
+      ) : (
+        <div className="space-y-4">
+          <div className="flex flex-wrap gap-2 text-xs">
+            {data.byPath.map((b) => (
+              <Badge key={b.path} tone="amber">
+                {overridePathLabel(b.path)} × {b.count}
+              </Badge>
+            ))}
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[720px] text-sm">
+              <thead>
+                <tr className="text-left text-xs uppercase tracking-wide text-slate-500">
+                  <th className="py-1 pr-2">When</th>
+                  <th className="py-1 pr-2">Figure</th>
+                  <th className="py-1 pr-2">Read from</th>
+                  <th className="py-1 pr-2 text-right">Read / corrected</th>
+                  <th className="py-1 pr-2">Reason</th>
+                  <th className="py-1">Job</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.overrides.map((o) => {
+                  const ev = o.evidence?.[0];
+                  return (
+                    <tr key={o.id} className={o.removedAt ? "border-t border-slate-100 text-slate-400" : "border-t border-slate-100"}>
+                      <td className="py-1 pr-2 whitespace-nowrap">{fmtDate(o.at)}</td>
+                      <td className="py-1 pr-2">
+                        {overridePathLabel(o.path)}
+                        <div className="text-xs text-slate-400">
+                          {o.software} {o.taxYear} · {o.profile ?? "no profile"}
+                        </div>
+                      </td>
+                      <td className="py-1 pr-2 text-xs">{ev ? `p${ev.page} line ${ev.line ?? "?"}: ${ev.label}` : "not found"}</td>
+                      <td className="py-1 pr-2 text-right font-mono text-xs whitespace-nowrap">
+                        {o.valuesPurged ? "purged" : `${o.extractedValue === null ? "none" : fmtMoney(o.extractedValue)} → ${fmtMoney(o.value)}`}
+                      </td>
+                      <td className="py-1 pr-2 text-xs">
+                        {o.reason}
+                        <div className="text-slate-400">
+                          {o.by}
+                          {o.removedAt ? ` · removed by ${o.removedBy}` : ""}
+                        </div>
+                      </td>
+                      <td className="py-1 text-xs">
+                        <Link className="text-brand hover:underline" to={`/jobs/${o.jobId}`}>
+                          open
+                        </Link>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </Card>
   );
 }

@@ -120,3 +120,65 @@ export const VOICES = {
 export type Voice = keyof typeof VOICES;
 export const VOICE_CODES = Object.keys(VOICES) as Voice[];
 export const DEFAULT_VOICE: Voice = "af_heart";
+
+/**
+ * Extracted figures a preparer may override when the profile misread a line (Q66). Paths match
+ * extraction.json; the worker's list is `worker/recap/extract/overrides.py` and must stay in step.
+ * State figures are `state.<CODE>.<field>` with the fields in OVERRIDE_STATE_FIELDS.
+ */
+export const OVERRIDE_FIELDS = [
+  { path: "income.wages", label: "Wages", line: "1z" },
+  { path: "income.interest", label: "Taxable interest", line: "2b" },
+  { path: "income.dividends", label: "Ordinary dividends", line: "3b" },
+  { path: "income.ira_pensions", label: "IRA distributions and pensions (taxable)", line: "4b + 5b" },
+  { path: "income.social_security_taxable", label: "Social security (taxable)", line: "6b" },
+  { path: "income.capital_gain", label: "Capital gain or loss", line: "7a" },
+  { path: "income.schedule_1_total", label: "Schedule 1 additional income", line: "8" },
+  { path: "income.total_income", label: "Total income", line: "9" },
+  { path: "adjustments.schedule_1_adjustments", label: "Schedule 1 adjustments", line: "10" },
+  { path: "adjustments.agi", label: "Adjusted gross income", line: "11a" },
+  { path: "deductions.amount", label: "Standard or itemized deduction", line: "12e" },
+  { path: "deductions.qbi", label: "QBI deduction", line: "13a" },
+  { path: "deductions.additional", label: "Schedule 1-A deductions", line: "13b" },
+  { path: "deductions.taxable_income", label: "Taxable income", line: "15" },
+  { path: "tax.tax", label: "Tax", line: "16" },
+  { path: "tax.schedule_2_total", label: "Schedule 2 additional tax", line: "17" },
+  { path: "tax.nonrefundable_credits", label: "Nonrefundable credits", line: "21" },
+  { path: "tax.other_taxes", label: "Other taxes", line: "23" },
+  { path: "tax.total_tax", label: "Total tax", line: "24" },
+  { path: "payments.withholding", label: "Withholding", line: "25d" },
+  { path: "payments.estimates", label: "Estimated payments", line: "26" },
+  { path: "payments.refundable_credits", label: "Refundable credits", line: "32" },
+  { path: "payments.total_payments", label: "Total payments", line: "33" },
+  { path: "result.refund", label: "Refund", line: "35a" },
+  { path: "result.applied_to_next_year", label: "Applied to next year", line: "36" },
+  { path: "result.amount_owed", label: "Amount owed", line: "37" },
+  { path: "extras.estimated_tax_penalty", label: "Estimated tax penalty", line: "38" },
+  { path: "prior_year.agi", label: "Prior year AGI", line: "comparison" },
+  { path: "prior_year.total_tax", label: "Prior year total tax", line: "comparison" },
+  { path: "prior_year.refund", label: "Prior year refund", line: "comparison" },
+  { path: "prior_year.amount_owed", label: "Prior year amount owed", line: "comparison" },
+] as const;
+export const OVERRIDE_STATE_FIELDS = [
+  { field: "taxable_income", label: "taxable income" },
+  { field: "tax", label: "tax" },
+  { field: "payments", label: "payments" },
+  { field: "refund", label: "refund" },
+  { field: "amount_owed", label: "amount owed" },
+  { field: "penalty", label: "penalty" },
+] as const;
+
+const STATE_OVERRIDE_RE = new RegExp(`^state\.([A-Z]{2})\.(${OVERRIDE_STATE_FIELDS.map((f) => f.field).join("|")})$`);
+
+export function isOverridePath(path: string): boolean {
+  return OVERRIDE_FIELDS.some((f) => f.path === path) || STATE_OVERRIDE_RE.test(path);
+}
+
+/** Human label for an override path, e.g. "Refund (line 35a)" or "MO refund". */
+export function overridePathLabel(path: string): string {
+  const f = OVERRIDE_FIELDS.find((x) => x.path === path);
+  if (f) return f.line === "comparison" ? f.label : `${f.label} (line ${f.line})`;
+  const m = STATE_OVERRIDE_RE.exec(path);
+  if (m) return `${m[1]} ${OVERRIDE_STATE_FIELDS.find((x) => x.field === m[2])?.label ?? m[2]}`;
+  return path;
+}

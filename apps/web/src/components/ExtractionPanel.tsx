@@ -5,52 +5,53 @@ import { ApiError, post } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { fmtMoney, fmtPct } from "../lib/format";
 import { Alert, Badge, Button, Card, Spinner, Textarea } from "../ui";
+import { OverrideForm, OverrideList } from "./ExtractionOverrides";
 
-const SECTIONS: Array<{ title: string; rows: Array<[string, (e: ExtractionDto) => string]> }> = [
+const SECTIONS: Array<{ title: string; rows: Array<[string, (e: ExtractionDto) => string, string?]> }> = [
   {
     title: "Income",
     rows: [
-      ["Wages", (e) => fmtMoney(e.income.wages)],
-      ["Taxable interest", (e) => fmtMoney(e.income.interest)],
-      ["Ordinary dividends", (e) => fmtMoney(e.income.dividends)],
-      ["IRA distributions and pensions (taxable)", (e) => fmtMoney(e.income.ira_pensions)],
-      ["Social security (taxable)", (e) => fmtMoney(e.income.social_security_taxable)],
-      ["Capital gain or loss", (e) => fmtMoney(e.income.capital_gain)],
-      ["Schedule 1 additional income", (e) => fmtMoney(e.income.schedule_1_total)],
-      ["Total income", (e) => fmtMoney(e.income.total_income)],
+      ["Wages", (e) => fmtMoney(e.income.wages), "income.wages"],
+      ["Taxable interest", (e) => fmtMoney(e.income.interest), "income.interest"],
+      ["Ordinary dividends", (e) => fmtMoney(e.income.dividends), "income.dividends"],
+      ["IRA distributions and pensions (taxable)", (e) => fmtMoney(e.income.ira_pensions), "income.ira_pensions"],
+      ["Social security (taxable)", (e) => fmtMoney(e.income.social_security_taxable), "income.social_security_taxable"],
+      ["Capital gain or loss", (e) => fmtMoney(e.income.capital_gain), "income.capital_gain"],
+      ["Schedule 1 additional income", (e) => fmtMoney(e.income.schedule_1_total), "income.schedule_1_total"],
+      ["Total income", (e) => fmtMoney(e.income.total_income), "income.total_income"],
     ],
   },
   {
     title: "Adjustments and deductions",
     rows: [
-      ["Schedule 1 adjustments", (e) => fmtMoney(e.adjustments.schedule_1_adjustments)],
-      ["Adjusted gross income", (e) => fmtMoney(e.adjustments.agi)],
-      ["Deduction", (e) => `${fmtMoney(e.deductions.amount)} (${e.deductions.type})`],
-      ["QBI deduction", (e) => fmtMoney(e.deductions.qbi)],
-      ["Taxable income", (e) => fmtMoney(e.deductions.taxable_income)],
+      ["Schedule 1 adjustments", (e) => fmtMoney(e.adjustments.schedule_1_adjustments), "adjustments.schedule_1_adjustments"],
+      ["Adjusted gross income", (e) => fmtMoney(e.adjustments.agi), "adjustments.agi"],
+      ["Deduction", (e) => `${fmtMoney(e.deductions.amount)} (${e.deductions.type})`, "deductions.amount"],
+      ["QBI deduction", (e) => fmtMoney(e.deductions.qbi), "deductions.qbi"],
+      ["Taxable income", (e) => fmtMoney(e.deductions.taxable_income), "deductions.taxable_income"],
     ],
   },
   {
     title: "Tax",
     rows: [
-      ["Tax", (e) => fmtMoney(e.tax.tax)],
-      ["Schedule 2 additional tax", (e) => fmtMoney(e.tax.schedule_2_total)],
-      ["Nonrefundable credits", (e) => fmtMoney(e.tax.nonrefundable_credits)],
-      ["Other taxes", (e) => fmtMoney(e.tax.other_taxes)],
-      ["Total tax", (e) => fmtMoney(e.tax.total_tax)],
+      ["Tax", (e) => fmtMoney(e.tax.tax), "tax.tax"],
+      ["Schedule 2 additional tax", (e) => fmtMoney(e.tax.schedule_2_total), "tax.schedule_2_total"],
+      ["Nonrefundable credits", (e) => fmtMoney(e.tax.nonrefundable_credits), "tax.nonrefundable_credits"],
+      ["Other taxes", (e) => fmtMoney(e.tax.other_taxes), "tax.other_taxes"],
+      ["Total tax", (e) => fmtMoney(e.tax.total_tax), "tax.total_tax"],
       ["Effective rate (of taxable income)", (e) => fmtPct(e.tax.effective_rate)],
     ],
   },
   {
     title: "Payments and result",
     rows: [
-      ["Withholding", (e) => fmtMoney(e.payments.withholding)],
-      ["Estimated payments", (e) => fmtMoney(e.payments.estimates)],
-      ["Refundable credits", (e) => fmtMoney(e.payments.refundable_credits)],
-      ["Total payments", (e) => fmtMoney(e.payments.total_payments)],
-      ["Refund", (e) => fmtMoney(e.result.refund)],
-      ["Applied to next year", (e) => fmtMoney(e.result.applied_to_next_year)],
-      ["Amount owed", (e) => fmtMoney(e.result.amount_owed)],
+      ["Withholding", (e) => fmtMoney(e.payments.withholding), "payments.withholding"],
+      ["Estimated payments", (e) => fmtMoney(e.payments.estimates), "payments.estimates"],
+      ["Refundable credits", (e) => fmtMoney(e.payments.refundable_credits), "payments.refundable_credits"],
+      ["Total payments", (e) => fmtMoney(e.payments.total_payments), "payments.total_payments"],
+      ["Refund", (e) => fmtMoney(e.result.refund), "result.refund"],
+      ["Applied to next year", (e) => fmtMoney(e.result.applied_to_next_year), "result.applied_to_next_year"],
+      ["Amount owed", (e) => fmtMoney(e.result.amount_owed), "result.amount_owed"],
     ],
   },
 ];
@@ -99,6 +100,7 @@ export function ExtractionPanel({ job, onChanged }: { job: JobDetailDto; onChang
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [showException, setShowException] = useState(false);
+  const [showOverride, setShowOverride] = useState(false);
 
   async function reextract() {
     setBusy(true);
@@ -116,6 +118,24 @@ export function ExtractionPanel({ job, onChanged }: { job: JobDetailDto; onChang
   const canReextract = can("preparer") && !["queued", "processing", "released", "purged"].includes(job.status);
   const ex = data?.extraction ?? null;
   const failedChecks = ex?.recon.checks.filter((c) => !c.ok && !c.warning).map((c) => c.name) ?? [];
+  const overrides = data?.overrides ?? [];
+  const overridden = new Map(overrides.map((o) => [o.path, o]));
+  // Overrides need a figure to correct: a stored extraction, or a job that failed reading the return.
+  const canOverride = canReextract && (!!ex || (job.status === "failed" && ["identify", "extract", "ocr"].includes(job.errorStep ?? "")));
+  const afterChange = () => {
+    setShowOverride(false);
+    void reload();
+    onChanged();
+  };
+  const overrideControls = canOverride ? (
+    showOverride ? (
+      <OverrideForm jobId={job.id} ex={ex} onDone={afterChange} onCancel={() => setShowOverride(false)} />
+    ) : (
+      <Button size="sm" variant="secondary" onClick={() => setShowOverride(true)}>
+        Override a misread figure
+      </Button>
+    )
+  ) : null;
 
   return (
     <Card
@@ -134,11 +154,23 @@ export function ExtractionPanel({ job, onChanged }: { job: JobDetailDto; onChang
       ) : error ? (
         <Alert kind="error">{error}</Alert>
       ) : !ex ? (
-        <p className="text-sm text-slate-500">No extraction yet. It appears once the worker finishes the extract step.</p>
+        <div className="space-y-3">
+          <p className="text-sm text-slate-500">No extraction yet. It appears once the worker finishes the extract step.</p>
+          {canOverride && (
+            <>
+              <p className="text-xs text-slate-500">
+                Reading the return failed{job.errorMessage ? `: ${job.errorMessage}` : ""}. If a required line was not found, enter it from the return and the job re-runs with it.
+              </p>
+              <OverrideList jobId={job.id} overrides={overrides} applied={[]} canEdit={canOverride} onChanged={afterChange} />
+              {overrideControls}
+            </>
+          )}
+        </div>
       ) : (
         <div className="space-y-4">
           <p className="text-xs text-slate-500">
-            Read-only. Values come from the return via profile <code>{ex.meta.profile}</code>. If a line is misread, fix the form profile and re-extract; values are never hand-edited.
+            Values come from the return via profile <code>{ex.meta.profile}</code>. If a line is misread, override it with the figure from the return; every override is logged so
+            the profile can be fixed, and the verifier still checks every amount in the script against the PDF.
           </p>
           <div className="flex flex-wrap gap-2 text-xs">
             <Badge>{ex.meta.software}</Badge>
@@ -157,12 +189,22 @@ export function ExtractionPanel({ job, onChanged }: { job: JobDetailDto; onChang
                 <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">{sec.title}</h3>
                 <table className="w-full text-sm">
                   <tbody>
-                    {sec.rows.map(([label, fn]) => (
-                      <tr key={label} className="border-t border-slate-100">
-                        <td className="py-1 pr-2 text-slate-600">{label}</td>
-                        <td className="py-1 text-right font-mono tabular-nums">{fn(ex)}</td>
-                      </tr>
-                    ))}
+                    {sec.rows.map(([label, fn, path]) => {
+                      const o = path ? overridden.get(path) : undefined;
+                      return (
+                        <tr key={label} className={o ? "border-t border-slate-100 bg-amber-50" : "border-t border-slate-100"}>
+                          <td className="py-1 pr-2 text-slate-600">
+                            {label}
+                            {o && (
+                              <span className="ml-2" title={`Read as ${o.extractedValue === null ? "nothing" : fmtMoney(o.extractedValue)}; overridden by ${o.by}`}>
+                                <Badge tone="amber">overridden</Badge>
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-1 text-right font-mono tabular-nums">{fn(ex)}</td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -174,7 +216,14 @@ export function ExtractionPanel({ job, onChanged }: { job: JobDetailDto; onChang
                   <tbody>
                     {ex.state.map((s) => (
                       <tr key={s.code} className="border-t border-slate-100">
-                        <td className="py-1 pr-2 text-slate-600">{s.code}</td>
+                        <td className="py-1 pr-2 text-slate-600">
+                          {s.code}
+                          {overrides.some((o) => o.path.startsWith(`state.${s.code}.`)) && (
+                            <span className="ml-2">
+                              <Badge tone="amber">overridden</Badge>
+                            </span>
+                          )}
+                        </td>
                         <td className="py-1 text-right font-mono tabular-nums">
                           tax {fmtMoney(s.tax)} · {s.refund ? `refund ${fmtMoney(s.refund)}` : `owed ${fmtMoney(s.amount_owed)}`}
                         </td>
@@ -186,7 +235,9 @@ export function ExtractionPanel({ job, onChanged }: { job: JobDetailDto; onChang
             )}
             {ex.prior_year.present && (
               <div>
-                <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Prior year</h3>
+                <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Prior year {overrides.some((o) => o.path.startsWith("prior_year.")) && <Badge tone="amber">overridden</Badge>}
+                </h3>
                 <table className="w-full text-sm">
                   <tbody>
                     <tr className="border-t border-slate-100">
@@ -250,6 +301,8 @@ export function ExtractionPanel({ job, onChanged }: { job: JobDetailDto; onChang
               </>
             )}
           </div>
+          <OverrideList jobId={job.id} overrides={overrides} applied={ex.overrides ?? []} canEdit={canOverride} onChanged={afterChange} />
+          {overrideControls}
           {ex.observations.length > 0 && (
             <div>
               <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Observations (computed)</h3>

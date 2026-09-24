@@ -17,7 +17,7 @@ import path from "node:path";
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import type { FileKind } from "@vibe-recap/shared";
-import { clients, files, jobEvents, jobs, type Client, type FileRow, type Job } from "../db/schema.js";
+import { clients, extractionOverrides, files, jobEvents, jobs, type Client, type FileRow, type Job } from "../db/schema.js";
 import { audit, SYSTEM_RETENTION, type Actor } from "./audit.js";
 import { getAllSettings } from "./settings.js";
 import { heldJobIds } from "../routes/feedback.js";
@@ -149,6 +149,12 @@ export async function runPurge(
     const remaining = await app.db.select({ id: files.id }).from(files).where(and(eq(files.jobId, jobId), isNull(files.purgedAt)));
     if (remaining.length === 0) {
       await app.db.update(jobs).set({ status: "purged", purgedAt: now, updatedAt: now }).where(eq(jobs.id, jobId));
+      // The override log keeps which line was misread and why, for profile work; the client's
+      // amounts go with the files (Q66).
+      await app.db
+        .update(extractionOverrides)
+        .set({ value: null, extractedValue: null, valuesPurgedAt: now })
+        .where(and(eq(extractionOverrides.jobId, jobId), isNull(extractionOverrides.valuesPurgedAt)));
       await app.db.insert(jobEvents).values({ jobId, status: "purged", message: `all files purged by ${actor.label}` });
       purgedJobs++;
     }
