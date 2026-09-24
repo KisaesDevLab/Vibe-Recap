@@ -23,7 +23,7 @@ Positioning inside the Vibe suite: a **standalone appliance** with its own UI, u
 | L11 | Delivery is download only. No share links, no client portal, no Vibe Connect or other integrations. | Kurt's decision 2026-09-03. Smallest attack surface; the firm already has a delivery channel. |
 | L12 | Worker container has no egress except to `ollama` on the internal network. API container's only outbound destination is `licensing.kisaes.com`. | §7216 posture must be enforceable, not just documented. |
 | L14 | Ollama is bundled in compose; `OLLAMA_URL` overrides to an external instance (on the M6: the host's existing Ollama, bundled service scaled to 0). | Q1. |
-| L15 | Extracted values are never hand-edited. Wrong extraction = wrong form profile; fix the profile and re-extract. | Q2. |
+| L15 | Extracted values are never hand-edited. Wrong extraction = wrong form profile; fix the profile and re-extract. Amended 2026-09-24 (QUESTIONS.md Q66): a `preparer` may override a misread figure with a reason; every override is logged with the line the profile misread, the job re-runs from `extract`, and recon, `validate` and `verify` still gate it. The profile fix remains the remedy; the override log is its work list. | Q2, Q66. |
 | L16 | Recon gate exceptions: a `preparer` may downgrade a named check to a warning with a written reason; audited; the job proceeds. The downgrade is per job, never global. | Q10. |
 | L17 | One firm per install. No multi-tenancy. | Q7. |
 | L18 | Greeting uses first name(s) only, from the return; setting to disable. | Q5. |

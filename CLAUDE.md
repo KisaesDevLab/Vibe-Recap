@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Operational notes for Claude Code working in this repo. Read this first, then `docs/PLAN.md`, then `docs/PHASES.md`, then `STATE.md`.
 
-> **Current state (2026-09-22):** all nine phases built and verified; v0.4.1 tagged (v0.1.0 was the first release);
+> **Current state (2026-09-24):** extraction overrides (Q66) and the UltraTax line-mapping fixes from a third real return (Q67) are on `main`, untagged. Earlier: all nine phases built and verified; v0.4.1 tagged (v0.1.0 was the first release);
 > it adds optional single sign-on through Vibe Auth (Q57 to Q62), verified in a real browser against a real authentik on the dev box, not yet registered on an appliance. Source is
 > public at `github.com/KisaesDevLab/Vibe-Recap`; images publish to GHCR from `.github/workflows/publish.yml`
 > on every push to `main` (`latest`, `sha-*`) and on `v*.*.*` tags. Read `STATE.md` for what changed after
@@ -113,7 +113,7 @@ Cross-cutting rules that are easy to miss:
 3. **Preparer approval before release; delivery is download only.** No share links, no portal, no Vibe Connect. A video is never downloadable until a user with `preparer` or `admin` role clicks Approve. The approve action snapshots the script and the extracted JSON.
 4. **No outbound network calls from the worker** except to the Vibe AI Router (via `airouter-proxy` on the egress-denied network; default script-generation provider since Kurt's 2026-09-05 decision, QUESTIONS.md Q37) and to Ollama (bundled container, or the host gateway when `OLLAMA_URL` points at the host). Enforce with an egress-denied network in compose plus socat relays for exactly those two targets. The API container may reach the router and `api.emailit.com` (outgoing email to firm users only, off until an admin enables it; Kurt's 2026-09-05 decision, QUESTIONS.md Q48). Once single sign-on is configured it may also reach the firm's identity provider (Vibe Auth; Kurt's 2026-09-20 decision, QUESTIONS.md Q57): discovery, keys and the token exchange, nothing from a return. The licensing server and license key were removed on Kurt's 2026-09-05 instruction (Q49); the product is PolyForm-licensed with no phone-home. There are no other integrations; do not add any. What leaves the box through the router is the script prompt (extracted figures, first names, filing status, states, preparer note), never the PDF; the router's task-class policy (`recap_script`) governs which provider serves it.
 5. **Retention is enforced by a job, not by trust.** The purge worker runs hourly and is the only thing that deletes files. Purges are logged to the audit table. A thumbs-down on a job (Q46) holds its files for 90 days or until an admin dismisses it; the hold moves the date, it never adds a deleter.
-6. **Extracted values are never hand-edited.** If a line is misread, the form profile is wrong. Fix the profile and re-extract. Recon failures may be downgraded to warnings per job by a preparer, with a reason, audited.
+6. **Misread figures are fixed in the profile; an override is the stopgap, and it is logged.** If a line is misread, the form profile is wrong: fix it and re-extract. Until then a preparer may override the figure with a reason (Kurt's 2026-09-24 decision, QUESTIONS.md Q66); every override goes to `extraction_overrides` with the value the mapper read and where (page, line, label), the job re-runs from `extract`, and recon, `validate` and `verify` gate it exactly as they gate the mapper. Never let an override skip a gate, and never let the misread value reach `allowed_amounts()`. Recon failures may be downgraded to warnings per job by a preparer, with a reason, audited.
 7. **No PII in logs.** Log job IDs and file hashes, never names, SSNs, or amounts. Redact structured logs at the logger level, not by convention.
 8. **Email goes to firm users only.** Invites, password-reset links, password-changed notices, and the admin's test message; recipients are always rows in `users`. Nothing from a return, no client addresses, no attachments. The Emailit key is a secret setting: masked in the API, excluded from export and import, redacted in logs.
 
@@ -165,6 +165,25 @@ Never commit a real tax return. `tests/fixtures/` contains synthetic 1040 packag
 - **UltraTax prints line labels and values in separate text runs**, the value about 4 points *above* its label, with the IRS line number repeated at x≈478 just left of the amount column. The profile uses a tight row band (3), a value zone from x=500, and `orphan_y_tolerance` to attach value rows; a wide band glues a value to the row above it instead.
 - **UltraTax client copies are 79 to 85 pages.** Summary, letters, filing instructions and the e-file authorization come first; the return starts a dozen pages in; a second copy of the federal pages follows the state return; worksheets and reports quote every form name and line label. Federal page classifiers require the OMB number (page 1, schedules) or the "Form 1040 (year) … Page 2" header; state pages are grouped with their continuation pages; `identify` reads year and names from the form page, never from page 1.
 - **The real 2025 Form 1040 renumbers lines**: 7a, 11a (page 1), 11b, 12e, 13a, 13b (Schedule 1-A deductions), 27a. `line:` in a profile takes a list of alternatives. Line 37 includes the line 38 penalty and states fold their penalty into the amount due; the recon checks accept that identity and record `penalty_included`.
+- **UltraTax pairs lines on one row** ("3a Qualified dividends 3a  b Ordinary dividends 3b"): the
+  row is keyed by the number printed beside the amount column (`_row_key`), never the prefix, and
+  the "a" amount sits in an inner column at x≈272 on the same value row. Lines 25a–c, 27a–31, 36
+  and 38 print in the inner column (right edge x≈469); a line read from there needs
+  `value_min_x: 380`. `tests/test_ultratax_geometry.py` fills every line on the real layout; run it
+  after any mapper or profile change.
+- **State figures come from `state.by_state`** in the base profile when the state is listed (MO,
+  AR): the line holding the liability, refund and amount due on that state's own form, with no
+  generic fallback. A generic label hit takes the first match across every page of the state's
+  group, which is how AR1000NR line 33 (before apportionment) was taken for the Arkansas tax. Add a
+  state there before trusting its figures in a video. The resident state is listed first.
+- **Comparison-report cells can be blank**: a value belongs to the column whose header it is
+  nearest, and a blank prior-year cell is zero, never the current-year amount beside it.
+- **Diagnose a misread line on the box** with `docker compose exec worker python -m recap.diagnose
+  <jobId>`: which row each figure came from, and the numbered rows with amounts and x positions.
+  It prints no header rows (names, SSNs); keep it that way.
+- **Python on this Windows box defaults to cp1252 and CRLF**: pass `encoding="utf-8"` (and
+  `newline="
+"` when writing) in any script that edits repo files.
 - **Real returns for testing** live in `tests/fixtures/real/` (gitignored). Never commit one; never print names or amounts from them into chat, logs, or commits.
 - **Playwright in Docker** needs `--no-sandbox` and `shm_size: 1g` or Chromium will crash on the second render.
 - **ffmpeg concat with per-image durations** requires the `-f concat` demuxer with a durations file; the last image must be listed twice or it is dropped.

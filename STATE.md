@@ -189,6 +189,42 @@ Recap session only.
 - Dev box: Vibe-1099's test containers hold ports 55432/56379; run Recap's tests against other
   ports with `TEST_DATABASE_URL` / `TEST_REDIS_URL`.
 
+## Extraction overrides and UltraTax line mapping (2026-09-24)
+
+Kurt reported a third real return (MO resident with an AR nonresident return) failing
+`total_income_foots` and `result_foots`, asked for figures to be overridable with a log for later
+profile work (Q66), and for every line to be proven against the return (Q67).
+
+- **Overrides (Q66).** `extraction_overrides` table (migration `0008_extraction_overrides`);
+  `POST /api/jobs/:id/extraction-overrides` (batch, one reason, preparer), `DELETE
+  …/extraction-overrides/:overrideId`, `GET /api/extraction-overrides?days=&format=csv` (admin).
+  The worker reads active rows at `extract` (`Db.active_overrides`) and `recap/extract/overrides.py`
+  applies them before the effective rate, observations and recon; `extraction.json` gains
+  `overrides` (with the mapper's value and `matches_extracted`) and `evidence` (page, line, label
+  per figure). An override may supply a required line the mapper missed. UI: *Override a misread
+  figure* on the job's Extraction card, overridden rows badged, the list with Remove; Settings ›
+  Quality lists the log with counts by field and a CSV. Purge clears the amounts in a purged job's
+  override rows. Feedback bundles carry the override history.
+- **Mapper and profile fixes (Q67)**: paired rows keyed by the number beside the amount column
+  (`_row_key`: 2b–6b never matched on UltraTax before), inner-column amounts no longer disqualify
+  a value row, line 36 read from the inner column, a blank prior-year comparison cell no longer
+  borrows the current year's amount, state figures from per-state rules (`state.by_state`, MO-1040
+  and AR1000F/NR) with no generic fallback, `state_<CODE>_figures_found` recon check, resident
+  state listed first. The synthetic MO page now prints real MO-1040 labels; fixtures regenerated.
+- **Evidence**: all three real returns pass recon; `worker/tests/test_real_returns.py` (the
+  identify/verifier checks it had, plus new ones) requires 22 federal figures and each state's
+  result to match the return's own comparison reports, read with an independent parser;
+  `worker/tests/test_ultratax_geometry.py` fills every Form 1040 line on the real UltraTax layout
+  (template `tests/fixtures/ultratax-2025-1040-geometry.json`, form text and positions only, from
+  `scripts/make-geometry-template.py`). `python -m recap.diagnose <jobId>` for the next misread.
+- **Not yet exercised**: the override flow in a browser on the live stack, and migration 0008 on
+  an existing database (it ran only in the test database). The job in Kurt's report needs
+  **Re-extract** once the new worker image is running; with these fixes it reconciles without an
+  override.
+- **Open for Kurt**: Q68, whether a Missouri refund should be narrated before or after the
+  estimated tax penalty (built: MO-1040 line 53, as printed). State taxable income is still not
+  read for MO or AR (it is not narrated or shown).
+
 ## Deviations from the plan
 
 - Phase 2: the "kill the worker mid-job, the rest continue" test is deferred to Phase 3 where the
