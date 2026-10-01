@@ -192,3 +192,28 @@ def test_labeled_amount_accepts_the_line_value_later_in_the_clause():
     wrong = golden(case).replace("your adjusted gross income was $147,300", "your adjusted gross income was $153,800")
     v = verify(wrong, pdf, None, str(PROFILES))
     assert any(k == "amount" and t == "$153,800" for k, t, _ in flagged(v)), flagged(v)
+
+
+def test_amount_belongs_to_the_figure_named_nearest_to_it():
+    """"Based on your taxable income, your income tax was $15,870" states the tax, not line 15."""
+    case = "mfj-refund-mo"
+    pdf = str(FIXTURES / f"ultratax-1040-2025-{case}.pdf")
+    script = golden(case).replace("The income tax on that amount was $15,870.", "Based on your taxable income, your income tax was $15,870.")
+    assert "Based on your taxable income" in script
+    v = verify(script, pdf, None, str(PROFILES))
+    assert v.passed, flagged(v)
+    # The line's own claim is still checked when nothing else is named in between.
+    wrong = golden(case).replace("brought your taxable income to $117,300", "brought your taxable income to $147,300")
+    v = verify(wrong, pdf, None, str(PROFILES))
+    assert any(k == "amount" and "taxable income" in (r or "") for k, _, r in flagged(v)), flagged(v)
+
+
+def test_state_named_in_the_greeting_sentence_is_not_a_person():
+    case = "mfj-refund-mo"
+    pdf = str(FIXTURES / f"ultratax-1040-2025-{case}.pdf")
+    script = golden(case).replace("Hi Alex and Jordan. This is a short recap", "Hi Alex and Jordan, this is a short recap")
+    assert "Hi Alex and Jordan, this is a short recap of your 2025 federal and Missouri" in script
+    v = verify(script, pdf, None, str(PROFILES))
+    assert v.passed, flagged(v)
+    stranger = script.replace("Hi Alex and Jordan,", "Hi Alex and Taylor,")
+    assert any(k == "names" and "Taylor" in t for k, t, _ in flagged(verify(stranger, pdf, None, str(PROFILES))))

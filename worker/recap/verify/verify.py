@@ -66,6 +66,12 @@ LABELED_PHRASES = [
     ("unemployment", "s1_unemployment"),
 ]
 
+# Names of other figures: one of these between a labeled phrase and an amount takes the amount.
+_OTHER_FIGURE = re.compile(
+    r"\b(?:tax|taxes|deductions?|credits?|refund|withholding|withheld|payments?|penalty|" + "|".join(re.escape(p) for p, _k in LABELED_PHRASES) + r")\b",
+    re.I,
+)
+
 # Where the coverage figures live on Form 1040, by label (independent of the profiles).
 # Page types that quote state names and form labels without being the return itself.
 _NON_FORM_PAGE = re.compile(r"Return Summary|Filing Instructions|Worksheet|Report|Projection|Comparison|\bDear |Sincerely|Signature Authorization|Estimated Tax Voucher|Payment Voucher")
@@ -425,6 +431,10 @@ def verify(script: str, source_pdf: str, prior_pdf: str | None = None, profiles_
             line_val = L.get(key)
             if line_val is None:
                 continue
+            # "Based on your taxable income, your income tax was $6,180": the amount belongs to the
+            # figure named nearest to it, so another figure's name in between ends this phrase's claim.
+            if _OTHER_FIGURE.search(sent[m.start() + len(phrase) : m.start(1)]):
+                continue
             # "qualified business income deduction of $1,800" names Form 1040 line 13a, not Schedule 1.
             if key == "s1_business" and re.search(r"\bqualified\s+$", sent[: m.start()], re.I):
                 continue
@@ -520,6 +530,9 @@ def verify(script: str, source_pdf: str, prior_pdf: str | None = None, profiles_
     greeting = next((s for sl, s in sentences if sl == "greeting"), sentences[0][1] if sentences else "")
     cap_words = re.findall(r"\b[A-Z][a-z]+\b", greeting)
     stop = {"Hi", "Hello", "Welcome", "Thanks", "Thank", "Here", "This", "Your", "The", "Let", "We", "It", "Good", "Dear", "For", "In", "On"}
+    # "your federal and Missouri returns" in the greeting names a state, not a person; the states
+    # check below decides whether that state belongs in the script.
+    stop |= {part for needles in _load_states(profiles_dir).values() for part in needles[0].split()} | {"Federal"}
     names_said = [w for w in cap_words if w not in stop and w != str(facts.tax_year)]
     allowed_names = {n.casefold() for n in (facts.first_name, facts.spouse_first_name) if n}
     if facts.filing_status not in ("MFJ", "MFS"):
