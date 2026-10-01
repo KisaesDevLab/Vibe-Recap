@@ -225,6 +225,37 @@ profile work (Q66), and for every line to be proven against the return (Q67).
   estimated tax penalty (built: MO-1040 line 53, as printed). State taxable income is still not
   read for MO or AR (it is not narrated or shown).
 
+## Schedule 1 by kind of income; verifier false positives (2026-10-01)
+
+Kurt asked for business, farm, rental and the like to be identified instead of one Schedule 1
+figure (Q69), and reported a job rejected at `script` on two verification flags (Q70).
+
+- **Extraction.** `schedule_1` in extraction.json: `taxable_refunds`, `alimony`, `business`,
+  `other_gains`, `rental_partnership`, `farm`, `unemployment`, `other` (Schedule 1 lines 1, 2a,
+  3 to 7, 9), read by optional profile lines on the `schedule_1` page. That page's classifier now
+  also requires "Additional Income": Schedules C, E and F quote "Schedule 1 (Form 1040)" and were
+  classified as Schedule 1 before (harmless then, nothing read the page).
+- **Recon.** `schedule_1_foots` (lines sum to Form 1040 line 8) runs only when a line was read.
+- **Narration and slide.** `recap/schedule1.py::breakdown` gives the kinds when they foot, else
+  nothing; `build_facts` and `income_bars` then fall back to "other income". The income slide
+  tightens its rows past eight bars.
+- **Verifier.** Reads Schedule 1 lines 3, 5, 6, 7 itself; "qualified business income" is not
+  business income; a Schedule 1-A page is not Schedule 1. Q70: an amount belongs to the figure
+  named nearest to it, and a state named in the greeting sentence is not a person.
+- **UI and overrides.** Lines with an amount show indented under line 8 in the extraction panel;
+  all eight are in `OVERRIDE_FIELDS` and `overrides.SECTIONS`; `allowed_amounts()` and its
+  TypeScript mirror include `schedule_1`.
+- **Tests.** `test_schedule1.py`; the UltraTax geometry template now carries Schedule 1 Part I
+  (regenerated from return C, Form 1040 pages byte-identical) and the geometry test fills lines
+  1 to 7 and 9, with 8b to 8u in the inner column to prove nothing leaks. All three real returns
+  foot, and the verifier agrees with the extraction on each. The six synthetic layouts print the
+  full Part I; `mfj-refund-mo` splits its $2,000 into business $3,200 and Schedule E -$1,200.
+- **Existing jobs** have no `schedule_1` until re-extracted; they keep narrating "other income".
+- **Not verified on the box:** no live job was run (no stack on the dev box today); a real script
+  attempt with the new facts has not been seen. Where 8a to 8z print on UltraTax's Schedule 1 is
+  assumed to be Form 1040's inner column (no real return fills one).
+- **Open for Kurt**: splitting Schedule E (Q69); keeping rejected script attempts (Q70).
+
 ## Deviations from the plan
 
 - Phase 2: the "kill the worker mid-job, the rest continue" test is deferred to Phase 3 where the

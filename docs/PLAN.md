@@ -107,6 +107,7 @@ Job states: `queued → processing → needs_review → approved → released �
   "meta": { "software": "ultratax", "tax_year": 2025, "form": "1040", "filing_status": "MFJ", "state_returns": ["MO"] },
   "taxpayer": { "first_name": "…", "last_name": "…", "spouse_first_name": "…" },
   "income": { "wages": 0, "interest": 0, "dividends": 0, "ira_pensions": 0, "social_security_taxable": 0, "capital_gain": 0, "schedule_1_total": 0, "total_income": 0 },
+  "schedule_1": { "taxable_refunds": 0, "alimony": 0, "business": 0, "other_gains": 0, "rental_partnership": 0, "farm": 0, "unemployment": 0, "other": 0 },
   "adjustments": { "schedule_1_adjustments": 0, "agi": 0 },
   "deductions": { "type": "standard|itemized", "amount": 0, "qbi": 0, "taxable_income": 0 },
   "tax": { "tax": 0, "schedule_2_total": 0, "nonrefundable_credits": 0, "other_taxes": 0, "total_tax": 0, "effective_rate": 0.0 },

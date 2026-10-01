@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Operational notes for Claude Code working in this repo. Read this first, then `docs/PLAN.md`, then `docs/PHASES.md`, then `STATE.md`.
 
-> **Current state (2026-09-24):** extraction overrides (Q66) and the UltraTax line-mapping fixes from a third real return (Q67) are on `main`, untagged. Earlier: all nine phases built and verified; v0.4.1 tagged (v0.1.0 was the first release);
+> **Current state (2026-10-01):** Schedule 1 by kind of income (Q69) and two verifier false-positive fixes (Q70) are on `main`, untagged, on top of extraction overrides (Q66) and the UltraTax line-mapping fixes from a third real return (Q67). Earlier: all nine phases built and verified; v0.4.1 tagged (v0.1.0 was the first release);
 > it adds optional single sign-on through Vibe Auth (Q57 to Q62), verified in a real browser against a real authentik on the dev box, not yet registered on an appliance. Source is
 > public at `github.com/KisaesDevLab/Vibe-Recap`; images publish to GHCR from `.github/workflows/publish.yml`
 > on every push to `main` (`latest`, `sha-*`) and on `v*.*.*` tags. Read `STATE.md` for what changed after
@@ -176,6 +176,11 @@ Never commit a real tax return. `tests/fixtures/` contains synthetic 1040 packag
   generic fallback. A generic label hit takes the first match across every page of the state's
   group, which is how AR1000NR line 33 (before apportionment) was taken for the Arkansas tax. Add a
   state there before trusting its figures in a video. The resident state is listed first.
+- **Schedule 1 kinds are named only when they foot.** `schedule_1` holds Part I lines 1 to 7 and
+  9; `recap/schedule1.py::breakdown` returns them only when they sum to Form 1040 line 8, and the
+  script facts and income slide otherwise say "other income". Line 5 is all of Schedule E in one
+  figure: never label it "rental" alone. Schedules C, E and F quote "Schedule 1 (Form 1040)", so
+  the page classifier also requires "Additional Income".
 - **Comparison-report cells can be blank**: a value belongs to the column whose header it is
   nearest, and a blank prior-year cell is zero, never the current-year amount beside it.
 - **Diagnose a misread line on the box** with `docker compose exec worker python -m recap.diagnose
