@@ -24,7 +24,10 @@
   table.figures td.v { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
   table.figures tr.total td { border-top: 4px solid var(--primary); border-bottom: none; font-weight: 700; color: var(--primary); }
   .bars { display: flex; flex-direction: column; gap: 22px; font-size: 32px; }
-  .bar { display: grid; grid-template-columns: 300px 1fr 240px; align-items: center; gap: 20px; }
+  .bar { display: grid; grid-template-columns: 340px 1fr 240px; align-items: center; gap: 20px; }
+  /* More than eight kinds of income (Schedule 1 by line): tighter rows so they still fit. */
+  .bars.dense { gap: 12px; font-size: 26px; }
+  .bars.dense .bar .track { height: 30px; }
   .bar .track { height: 44px; background: #e9e6df; border-radius: 8px; overflow: hidden; }
   .bar .fill { height: 100%; background: var(--primary); border-radius: 8px; }
   .bar .fill.neg { background: #b45309; }
@@ -61,7 +64,7 @@
   {% elif slide == "income" %}
     <h1>What you earned</h1>
     <h2>Total income <strong>{{ ex.income.total_income | money }}</strong></h2>
-    <div class="bars">
+    <div class="bars{% if income_bars | length > 8 %} dense{% endif %}">
       {% for b in income_bars %}
       <div class="bar"><span>{{ b.label }}</span><div class="track"><div class="fill{% if b.negative %} neg{% endif %}" style="width: {{ b.width }}%"></div></div><span class="v">{{ b.text }}</span></div>
       {% endfor %}

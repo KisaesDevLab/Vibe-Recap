@@ -466,6 +466,7 @@ def extract_document(
         "meta": {"filing_status": status, "state_returns": []},
         "taxpayer": {"first_name": first, "last_name": last, "spouse_first_name": spouse if status in ("MFJ", "MFS") else None},
         "income": v.get("income", {}),
+        "schedule_1": v.get("schedule_1", {}),
         "adjustments": v.get("adjustments", {}),
         "deductions": {"type": deduction_type, **v.get("deductions", {})},
         "tax": v.get("tax", {}),

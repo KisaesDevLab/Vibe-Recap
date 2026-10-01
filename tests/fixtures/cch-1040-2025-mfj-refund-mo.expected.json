@@ -23,6 +23,16 @@
     "schedule_1_total": 2000,
     "total_income": 153800
   },
+  "schedule_1": {
+    "taxable_refunds": 0,
+    "alimony": 0,
+    "business": 3200,
+    "other_gains": 0,
+    "rental_partnership": -1200,
+    "farm": 0,
+    "unemployment": 0,
+    "other": 0
+  },
   "adjustments": {
     "schedule_1_adjustments": 6500,
     "agi": 147300
@@ -99,6 +109,12 @@
         "name": "total_income_foots",
         "expected": 153800,
         "actual": 153800,
+        "ok": true
+      },
+      {
+        "name": "schedule_1_foots",
+        "expected": 2000,
+        "actual": 2000,
         "ok": true
       },
       {

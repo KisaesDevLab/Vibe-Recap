@@ -57,6 +57,13 @@ LABELED_PHRASES = [
     ("balance due", "amount_owed"),
     ("amount due", "amount_owed"),
     ("withholding", "withholding"),
+    # Kinds of income named from Schedule 1 (Q69): the amount must be that line of the schedule.
+    ("business income", "s1_business"),
+    ("business loss", "s1_business"),
+    ("farm income", "s1_farm"),
+    ("farm loss", "s1_farm"),
+    ("rental income", "s1_rental"),
+    ("unemployment", "s1_unemployment"),
 ]
 
 # Where the coverage figures live on Form 1040, by label (independent of the profiles).
@@ -72,6 +79,13 @@ LINE_LABELS = {
     "refund": r"refunded to you",
     "amount_owed": r"amount you owe",
     "withholding": r"withheld|lines 25a through 25c",  # the real form's 25d says "Add lines 25a through 25c"
+}
+# Schedule 1 Part I lines the script may name by kind, by the form's own label.
+SCHEDULE_1_LABELS = {
+    "s1_business": r"business income or \(loss\)",
+    "s1_rental": r"rental real estate, royalties",
+    "s1_farm": r"farm income or \(loss\)",
+    "s1_unemployment": r"unemployment compensation",
 }
 
 
@@ -219,6 +233,10 @@ def read_return(pages: list[VPage], prior_pages: list[VPage] | None, profiles_di
     # key lines
     for key, label in LINE_LABELS.items():
         hit = _first_line_amount(pages, label)
+        if hit:
+            f.lines[key] = hit[0]
+    for key, label in SCHEDULE_1_LABELS.items():
+        hit = _first_line_amount(pages, label, ("schedule_1",))
         if hit:
             f.lines[key] = hit[0]
     # bank numbers on the refund line area
@@ -406,6 +424,9 @@ def verify(script: str, source_pdf: str, prior_pdf: str | None = None, profiles_
                 continue
             line_val = L.get(key)
             if line_val is None:
+                continue
+            # "qualified business income deduction of $1,800" names Form 1040 line 13a, not Schedule 1.
+            if key == "s1_business" and re.search(r"\bqualified\s+$", sent[: m.start()], re.I):
                 continue
             # "the income tax on your taxable income was $13,240" names the tax, not the line.
             if re.search(r"\b(tax|taxes|rate|percent|%)\s+(on|of)\s+(?:your\s+|the\s+|that\s+)?$", sent[: m.start()], re.I):

@@ -24,6 +24,16 @@
     "schedule_1_total": 0,
     "total_income": 71805
   },
+  "schedule_1": {
+    "taxable_refunds": 0,
+    "alimony": 0,
+    "business": 0,
+    "other_gains": 0,
+    "rental_partnership": 0,
+    "farm": 0,
+    "unemployment": 0,
+    "other": 0
+  },
   "adjustments": {
     "schedule_1_adjustments": 0,
     "agi": 71805

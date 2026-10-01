@@ -120,7 +120,7 @@ def page_kind(page: VPage) -> str:
         return "comparison"
     if "schedule a" in head and "(form 1040" in head and "omb no. 1545" in text:
         return "schedule_a"
-    if "schedule 1" in head and "(form 1040" in head and "omb no. 1545" in text:
+    if "schedule 1" in head and "schedule 1-a" not in head and "(form 1040" in head and "omb no. 1545" in text:
         return "schedule_1"
     if "form 2210" in head and "worksheet" not in head:
         return "form_2210"

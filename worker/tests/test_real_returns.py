@@ -59,6 +59,11 @@ def test_real_return_extracts_and_reconciles(idx):
     assert facts.lines["total_tax"] == ex["tax"]["total_tax"], f"return-{idx}: verifier total tax differs"
     if ex["prior_year"]["present"]:
         assert facts.prior.get("agi") == ex["prior_year"]["agi"], f"return-{idx}: verifier prior AGI differs"
+    # Schedule 1 by kind (Q69): the lines foot to Form 1040 line 8, and the verifier reads the same ones.
+    if ex["income"]["schedule_1_total"]:
+        assert any(c["name"] == "schedule_1_foots" and c["ok"] for c in ex["recon"]["checks"]), f"return-{idx}: Schedule 1 lines not read"
+        for vkey, key in (("s1_business", "business"), ("s1_rental", "rental_partnership"), ("s1_farm", "farm"), ("s1_unemployment", "unemployment")):
+            assert facts.lines.get(vkey, 0) == ex["schedule_1"][key], f"return-{idx}: verifier Schedule 1 {key} differs"
 
 
 # -- cross-check against the comparison reports (Q67) --------------------------------------

@@ -1,6 +1,6 @@
 """Build tests/fixtures/<software>-2025-1040-geometry.json from a real client copy.
 
-The template keeps the Form 1040 pages' printed form text and its positions and nothing from the
+The template keeps the Form 1040 pages' (and Schedule 1 Part I's) printed form text and its positions and nothing from the
 return: every amount is dropped, and so is every row that carries no IRS line number, which is
 where names, SSNs, addresses, dependents, bank details and signatures sit. Tokens with five or
 more digits, masks (XXX, ***) and check marks are dropped from the rows that remain. The worker's
@@ -49,14 +49,15 @@ def main(argv: list[str]) -> int:
     with pdfplumber.open(pdf_path) as pdf:
         pages = read_pages(pdf, profile)
     out: dict[str, list[dict]] = {}
-    for kind in ("f1040_1", "f1040_2"):
+    for kind in ("f1040_1", "f1040_2", "schedule_1"):
         page = next(p for p in pages if p.kind == kind)
         words: list[dict] = []
         # Body of the form: page 1 from the income section down, page 2 above the signature block.
         # Unnumbered rows there keep only their left-margin sidebar words ("Married filing
         # jointly"), which share rows with amounts in the real layout; the header (names, SSNs,
         # address, dependents) and the signature block (preparer, firm, phone) are never read.
-        lo, hi = (435.0, 760.0) if kind == "f1040_1" else (0.0, 590.0)
+        # Schedule 1: Part I, lines 1 through 10, between the 1099-K note and the footer.
+        lo, hi = {"f1040_1": (435.0, 760.0), "f1040_2": (0.0, 590.0), "schedule_1": (160.0, 655.0)}[kind]
         for ln in page.lines:
             if not lo <= ln.top <= hi:
                 continue

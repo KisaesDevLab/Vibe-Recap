@@ -52,7 +52,7 @@ function walkInts(obj: unknown, out: Set<number>) {
 
 export function allowedAmounts(ex: ExtractionDto): Set<number> {
   const out = new Set<number>();
-  for (const k of ["income", "adjustments", "deductions", "tax", "payments", "result", "state", "prior_year"] as const) walkInts(ex[k], out);
+  for (const k of ["income", "schedule_1", "adjustments", "deductions", "tax", "payments", "result", "state", "prior_year"] as const) walkInts(ex[k], out);
   for (const o of ex.observations) if (Number.isInteger(o.delta)) out.add(Math.abs(o.delta));
   return out;
 }

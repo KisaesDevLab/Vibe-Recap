@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from .. import schedule1
+
 TOLERANCE = 1
 
 
@@ -41,6 +43,20 @@ def _result_check(doc: dict[str, Any], ex: set[str]) -> dict[str, Any]:
     return row
 
 
+def _schedule_1_check(doc: dict[str, Any], ex: set[str]) -> list[dict[str, Any]]:
+    """Schedule 1 lines 1 through 7 and 9 = Form 1040 line 8, when any of them was read.
+
+    A package without the schedule (or one whose lines were all blank) has nothing to foot and
+    gets no check. Downgraded, the narration falls back to the single line 8 figure
+    (`schedule1.breakdown`), so the kinds of income are never named from lines that do not foot.
+    """
+    found = schedule1.parts(doc)
+    if not found:
+        return []
+    total = int((doc.get("income") or {}).get("schedule_1_total") or 0)
+    return [_check("schedule_1_foots", sum(v for _k, v in found), total, ex)]
+
+
 def reconcile(doc: dict[str, Any], exceptions: set[str] | None = None) -> dict[str, Any]:
     ex = exceptions or set()
     inc, adj, ded, tax, pay, res = (doc.get(k, {}) for k in ("income", "adjustments", "deductions", "tax", "payments", "result"))
@@ -56,6 +72,7 @@ def reconcile(doc: dict[str, Any], exceptions: set[str] | None = None) -> dict[s
             g(inc, "total_income"),
             ex,
         ),
+        *_schedule_1_check(doc, ex),
         _check("agi_foots", g(inc, "total_income") - g(adj, "schedule_1_adjustments"), g(adj, "agi"), ex),
         # 2025 line 14 = 12e + 13a + 13b (Schedule 1-A deductions); earlier years have no 13b and `additional` is 0
         _check("taxable_income_foots", max(0, g(adj, "agi") - g(ded, "amount") - g(ded, "qbi") - g(ded, "additional")), g(ded, "taxable_income"), ex),

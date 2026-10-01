@@ -1,4 +1,4 @@
-"""Every Form 1040 line on the real UltraTax layout maps, including lines no real fixture fills.
+"""Every Form 1040 and Schedule 1 Part I line on the real UltraTax layout maps, including lines no real fixture fills.
 
 tests/fixtures/ultratax-2025-1040-geometry.json is the printed form text and positions of a real
 UltraTax 2025 client copy with every amount removed (scripts/make-geometry-template.py). This test
@@ -7,6 +7,8 @@ writes an amount on every line, in the column UltraTax prints it in, measured on
 - main column, right edge x~584.5: 1a-1h, 1z, 2b-6b, 7a-11a, 11b-24, 25d, 26, 32-35a, 37
 - inner column, right edge x~469.3: 1i, 25a-25c, 27a-31, 36, 38
 - "a" column, right edge x~293.4: 2a-6a (printed beside the matching "b" amount)
+- Schedule 1 main column, same right edge: 1, 2a, 3-7, 9 (line 7's amount sits on its second
+  label row); 8b-8u are placed in the inner column, where Form 1040 prints its inner amounts
 
 and requires every figure the profile reads to come back exactly, with no inner-column amount
 leaking into a main-column line. A blank line on one return says nothing about the next, so the
@@ -41,6 +43,12 @@ PAGE2_LINES = {
     MAIN: ["11b", "12e", "13a", "13b", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25d", "26", "32", "33", "34", "35a", "37"],
     INNER: ["25a", "25b", "25c", "27a", "28", "29", "30", "31", "36", "38"],
 }
+# Schedule 1 lines carry an "s1:" prefix here: its line numbers repeat Form 1040's.
+SCHED1_LINES = {
+    MAIN: ["s1:1", "s1:2a", "s1:3", "s1:4", "s1:5", "s1:6", "s1:7", "s1:9"],
+    INNER: ["s1:8b", "s1:8c", "s1:8e", "s1:8f", "s1:8g", "s1:8h", "s1:8i", "s1:8j", "s1:8k", "s1:8m", "s1:8n", "s1:8o", "s1:8p", "s1:8q", "s1:8r", "s1:8u"],
+}
+PAGES = (("f1040_1", PAGE1_LINES), ("f1040_2", PAGE2_LINES), ("schedule_1", SCHED1_LINES))
 
 # Figure path -> the line(s) it reads (summed).
 EXPECTED = {
@@ -71,6 +79,14 @@ EXPECTED = {
     "result.applied_to_next_year": ["36"],
     "result.amount_owed": ["37"],
     "extras.estimated_tax_penalty": ["38"],
+    "schedule_1.taxable_refunds": ["s1:1"],
+    "schedule_1.alimony": ["s1:2a"],
+    "schedule_1.business": ["s1:3"],
+    "schedule_1.other_gains": ["s1:4"],
+    "schedule_1.rental_partnership": ["s1:5"],
+    "schedule_1.farm": ["s1:6"],
+    "schedule_1.unemployment": ["s1:7"],
+    "schedule_1.other": ["s1:9"],
 }
 
 
@@ -81,12 +97,19 @@ def _template_words(kind: str) -> list[Word]:
 def _anchor_top(words: list[Word], line: str) -> float:
     """Top of the row whose amount belongs to `line`: the row carrying its repeated number beside
     an amount column, else the row it opens. An "a" line shares the row of its "b" line."""
-    if line[-1] == "a" and line[:-1] in "23456":
+    schedule_1 = line.startswith("s1:")
+    line = line.removeprefix("s1:")
+    if line[-1] == "a" and line[:-1] in "23456" and not schedule_1:
         line = line[:-1] + "b"
     rows = cluster_lines(words, 3)
     for ln in rows:
         _n, label_words, _a = _row_number(ln, "auto", 500)
         if (_paired_number(label_words) or "").lower() == line.lower():
+            return ln.top
+    # A two-row label (Schedule 1 line 7) repeats its number on the second row, which opens with
+    # label text; the amount sits on that row.
+    for ln in rows:
+        if any(w.text == line and w.x0 >= 400 for w in ln.words):
             return ln.top
     for ln in rows:
         number, _l, _a = _row_number(ln, "auto", 500)
@@ -107,15 +130,15 @@ def _page(kind: str, lines: dict[float, list[str]], values: dict[str, int]) -> P
             if name in values:
                 words.append(_amount_word(f"{values[name]:,}", right, _anchor_top(base, name) - VALUE_RISE))
     rows = cluster_lines(words, float(PROFILE["geometry"]["y_tolerance"]))
-    return PageInfo(1 if kind == "f1040_1" else 2, kind, rows, words, "\n".join(r.text for r in rows))
+    return PageInfo([k for k, _g in PAGES].index(kind) + 1, kind, rows, words, "\n".join(r.text for r in rows))
 
 
 def _all_lines() -> list[str]:
-    return [n for group in (PAGE1_LINES, PAGE2_LINES) for names in group.values() for n in names]
+    return [n for _kind, group in PAGES for names in group.values() for n in names]
 
 
 def _map(values: dict[str, int]) -> dict:
-    pages = [_page("f1040_1", PAGE1_LINES, values), _page("f1040_2", PAGE2_LINES, values)]
+    pages = [_page(kind, group, values) for kind, group in PAGES]
     return map_lines(pages, PROFILE).values
 
 
@@ -125,7 +148,7 @@ def _get(values: dict, path: str) -> int | None:
 
 
 def test_template_has_every_line():
-    for kind, group in (("f1040_1", PAGE1_LINES), ("f1040_2", PAGE2_LINES)):
+    for kind, group in PAGES:
         words = _template_words(kind)
         for names in group.values():
             for name in names:
@@ -154,7 +177,7 @@ def test_small_amounts_are_not_taken_for_line_numbers():
 
 @pytest.mark.parametrize("column", ["inner", "a"])
 def test_inner_amounts_never_leak_into_blank_main_lines(column):
-    names = PAGE1_LINES[INNER] + PAGE2_LINES[INNER] if column == "inner" else PAGE1_LINES[A_COL]
+    names = PAGE1_LINES[INNER] + PAGE2_LINES[INNER] + SCHED1_LINES[INNER] if column == "inner" else PAGE1_LINES[A_COL]
     values = {name: 50_000 + 1_117 * i for i, name in enumerate(names)}
     got = _map(values)
     leaked = {}

@@ -62,6 +62,19 @@ FILING_STATUS_TEXT = {
 # ---------------------------------------------------------------------------
 
 
+# Schedule 1 Part I as the IRS prints it: (extraction key, line, label).
+SCHEDULE_1_LINES = [
+    ("taxable_refunds", "1", "Taxable refunds, credits, or offsets of state and local income taxes"),
+    ("alimony", "2a", "Alimony received"),
+    ("business", "3", "Business income or (loss). Attach Schedule C"),
+    ("other_gains", "4", "Other gains or (losses). Attach Form 4797"),
+    ("rental_partnership", "5", "Rental real estate, royalties, partnerships, S corporations, trusts, etc. Attach Schedule E"),
+    ("farm", "6", "Farm income or (loss). Attach Schedule F"),
+    ("unemployment", "7", "Unemployment compensation"),
+    ("other", "9", "Total other income. Add lines 8a through 8z"),
+]
+
+
 @dataclass
 class Case:
     id: str
@@ -78,6 +91,9 @@ class Case:
     social_security_taxable: int = 0
     capital_gain: int = 0
     schedule_1_total: int = 0
+    # Schedule 1 Part I by line (keys of SCHEDULE_1_LINES); must sum to schedule_1_total.
+    # Left empty, the whole of line 8 is business income on line 3.
+    schedule_1_parts: dict = field(default_factory=dict)
     schedule_1_adjustments: int = 0
     deduction_type: str = "standard"
     deduction_amount: int = 30000
@@ -104,6 +120,14 @@ class Case:
     @property
     def ira_pensions(self) -> int:
         return self.ira_distributions + self.pensions
+
+    @property
+    def schedule_1(self) -> dict:
+        parts = self.schedule_1_parts or ({"business": self.schedule_1_total} if self.schedule_1_total else {})
+        assert sum(parts.values()) == self.schedule_1_total, f"{self.id}: Schedule 1 parts do not foot to line 8"
+        # A package without the schedule prints none of its lines.
+        printed = bool(self.schedule_1_total or self.schedule_1_adjustments)
+        return {key: (parts.get(key, 0) if printed else 0) for key, _n, _t in SCHEDULE_1_LINES}
 
     @property
     def total_income(self) -> int:
@@ -182,6 +206,7 @@ def observations(case: Case, with_prior: bool | None = None) -> list[dict]:
 def expected_json(case: Case, software: str) -> dict:
     recon_checks = [
         {"name": "total_income_foots", "expected": case.total_income, "actual": case.total_income, "ok": True},
+        *([{"name": "schedule_1_foots", "expected": case.schedule_1_total, "actual": case.schedule_1_total, "ok": True}] if any(case.schedule_1.values()) else []),
         {"name": "agi_foots", "expected": case.agi, "actual": case.agi, "ok": True},
         {"name": "taxable_income_foots", "expected": case.taxable_income, "actual": case.taxable_income, "ok": True},
         {"name": "total_tax_foots", "expected": case.total_tax, "actual": case.total_tax, "ok": True},
@@ -217,6 +242,7 @@ def expected_json(case: Case, software: str) -> dict:
             "schedule_1_total": case.schedule_1_total,
             "total_income": case.total_income,
         },
+        "schedule_1": case.schedule_1,
         "adjustments": {"schedule_1_adjustments": case.schedule_1_adjustments, "agi": case.agi},
         "deductions": {
             "type": case.deduction_type,
@@ -262,7 +288,7 @@ CASES: list[Case] = [
         id="mfj-refund-mo",
         first_name="Alex", last_name="Fixture", spouse_first_name="Jordan", filing_status="MFJ",
         wages=142_500, interest=1_240, dividends=3_860, pensions=0, capital_gain=4_200,
-        schedule_1_total=2_000, schedule_1_adjustments=6_500,
+        schedule_1_total=2_000, schedule_1_parts={"business": 3_200, "rental_partnership": -1_200}, schedule_1_adjustments=6_500,
         deduction_type="standard", deduction_amount=30_000, qbi=0,
         tax=15_870, nonrefundable_credits=2_000, other_taxes=283,
         withholding=17_900, estimates=0,
@@ -615,8 +641,9 @@ def draw_schedule1(L: Layout, case: Case, page: int, total: int):
     y -= 26
     L.header("Part I  Additional Income", y, 10)
     y -= L.line_h
-    L.line(y, "3", "Business income or (loss). Attach Schedule C", case.schedule_1_total)
-    y -= L.line_h
+    for key, num, text in SCHEDULE_1_LINES:
+        L.line(y, num, text, case.schedule_1[key])
+        y -= L.line_h
     L.line(y, "10", "Combine lines 1 through 7 and 9. This is your additional income", case.schedule_1_total)
     y -= L.line_h * 2
     L.header("Part II  Adjustments to Income", y, 10)

@@ -14,6 +14,7 @@ from typing import Any, Callable
 
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
+from .. import schedule1
 from ..validate import format_errors_for_model, validate_script
 from .ollama import Ollama, OllamaError
 
@@ -24,6 +25,18 @@ FILING_STATUS_TEXT = {
     "MFS": "married filing separately",
     "HOH": "head of household",
     "QSS": "qualifying surviving spouse",
+}
+# Schedule 1 Part I lines as the model is told them. Line 5 is one figure for everything on
+# Schedule E, so its label says "combined" rather than letting the model call it all rent.
+SCHEDULE_1_TEXT = {
+    "taxable_refunds": "Taxable state and local tax refunds",
+    "alimony": "Alimony received",
+    "business": "Business income or loss (Schedule C)",
+    "other_gains": "Other gains or losses from the sale of business property",
+    "rental_partnership": "Rental real estate, royalties, partnerships, S corporations and trusts, combined (Schedule E)",
+    "farm": "Farm income or loss (Schedule F)",
+    "unemployment": "Unemployment compensation",
+    "other": "Other income",
 }
 OBS_TEXT = {
     "yoy_agi": "Adjusted gross income changed by {delta} ({pct}) compared with last year",
@@ -62,7 +75,12 @@ def build_facts(ex: dict[str, Any]) -> list[str]:
     add("IRA distributions and pensions (taxable)", inc.get("ira_pensions"))
     add("Taxable social security", inc.get("social_security_taxable"))
     add("Capital gain or loss", inc.get("capital_gain"))
-    add("Other income from Schedule 1", inc.get("schedule_1_total"))
+    # Line 8 by kind when Schedule 1 foots to it, else the one figure (Q69).
+    kinds = schedule1.breakdown(ex)
+    for key, value in kinds:
+        add(SCHEDULE_1_TEXT[key], value)
+    if not kinds:
+        add("Other income from Schedule 1", inc.get("schedule_1_total"))
     add("Total income", inc.get("total_income"), zero_ok=True)
     add("Adjustments to income", adj.get("schedule_1_adjustments"))
     add("Adjusted gross income", adj.get("agi"), zero_ok=True)

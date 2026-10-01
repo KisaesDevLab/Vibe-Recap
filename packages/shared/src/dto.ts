@@ -217,6 +217,17 @@ export interface ExtractionDto {
   meta: { software: string; tax_year: number; form: string; filing_status: string; state_returns: string[]; profile?: string };
   taxpayer: { first_name: string | null; last_name: string | null; spouse_first_name: string | null };
   income: { wages: number; interest: number; dividends: number; ira_pensions: number; social_security_taxable: number; capital_gain: number; schedule_1_total: number; total_income: number };
+  /** Schedule 1 Part I by line (Q69); absent on extractions made before it was read. */
+  schedule_1?: {
+    taxable_refunds: number;
+    alimony: number;
+    business: number;
+    other_gains: number;
+    rental_partnership: number;
+    farm: number;
+    unemployment: number;
+    other: number;
+  };
   adjustments: { schedule_1_adjustments: number; agi: number };
   deductions: { type: "standard" | "itemized"; amount: number; qbi: number; taxable_income: number };
   tax: { tax: number; schedule_2_total: number; nonrefundable_credits: number; other_taxes: number; total_tax: number; effective_rate: number };

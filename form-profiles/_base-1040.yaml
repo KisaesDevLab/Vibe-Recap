@@ -17,7 +17,9 @@ geometry:
 pages:
   comparison: { any: ['Two.Year Comparison', 'Tax Return Comparison', 'Comparison of .* Tax Returns'] }
   form_2210: { any: ['Form 2210 \(', 'Underpayment of Estimated Tax'], not: ['Worksheet', 'Report'] }
-  schedule_1: { any: ['Schedule 1 \(Form 1040'], all: ['OMB No\.? 1545-0074'] }
+  # Schedules C, E and F say "Schedule 1 (Form 1040), line 3" and carry the same OMB number; the
+  # Part I heading keeps them out, and page 2 of Schedule 1 (Part II) has no OMB number.
+  schedule_1: { any: ['Schedule 1 \(Form 1040'], all: ['OMB No\.? 1545-0074', 'Additional Income'] }
   schedule_a: { any: ['Schedule A \(Form 1040'], all: ['OMB No\.? 1545-0074'] }
   f1040_1: { any: ['Form 1040\b', 'U\.S\. Individual Income Tax Return', '1040-SR'], all: ['Filing Status', 'OMB No\.? 1545-0074'], not: ['Schedule [1-3A] \(Form 1040'] }
   f1040_2: { any: ['Form 1040 \(20\d\d\)', 'Form 1040-SR \(20\d\d\)'], all: ['total tax|Amount You Owe|Refund', 'Page 2'], not: ['Filing Status', 'Schedule [1-3A] \(Form 1040', 'OMB No\.? 1545'] }
@@ -77,6 +79,17 @@ lines:
   # Line 38 is printed in the smaller box left of the main amount column, hence its own value zone.
   - { path: extras.estimated_tax_penalty, page: f1040_2, line: '38', label: 'Estimated tax penalty', required: false, value_min_x: 380 }
   - { path: extras.itemized_total, page: schedule_a, line: '17', label: 'Total itemized deductions', required: false }
+  # Schedule 1 Part I: what line 8 is made of (Q69). Optional: when the nonzero lines foot to
+  # line 8 the narration names them, otherwise it says "other income". Line 9 is the total of
+  # 8a through 8z; line 5 is everything from Schedule E in one figure.
+  - { path: schedule_1.taxable_refunds, page: schedule_1, line: '1', label: 'Taxable refunds', required: false }
+  - { path: schedule_1.alimony, page: schedule_1, line: '2a', label: 'Alimony received', required: false }
+  - { path: schedule_1.business, page: schedule_1, line: '3', label: 'Business income', required: false }
+  - { path: schedule_1.other_gains, page: schedule_1, line: '4', label: 'Other gains', required: false }
+  - { path: schedule_1.rental_partnership, page: schedule_1, line: '5', label: 'Rental real estate', required: false }
+  - { path: schedule_1.farm, page: schedule_1, line: '6', label: 'Farm income', required: false }
+  - { path: schedule_1.unemployment, page: schedule_1, line: '7', label: 'Unemployment compensation', required: false }
+  - { path: schedule_1.other, page: schedule_1, line: '9', label: 'Total other income', required: false }
 
 # State lines are matched by label across every page of the state's form, first hit wins, so the
 # patterns rule out the federal figures that state forms restate ("Total tax from federal return",

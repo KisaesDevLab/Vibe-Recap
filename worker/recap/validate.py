@@ -56,7 +56,7 @@ def _walk_numbers(obj: Any) -> Iterable[int | float]:
 def allowed_amounts(extraction: dict[str, Any]) -> set[int]:
     """Every integer in the extraction plus observation deltas, as absolute values."""
     out: set[int] = set()
-    for section in ("income", "adjustments", "deductions", "tax", "payments", "result", "state", "prior_year"):
+    for section in ("income", "schedule_1", "adjustments", "deductions", "tax", "payments", "result", "state", "prior_year"):
         for n in _walk_numbers(extraction.get(section)):
             if isinstance(n, int):
                 out.add(abs(n))

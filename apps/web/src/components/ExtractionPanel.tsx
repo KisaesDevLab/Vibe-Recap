@@ -7,7 +7,15 @@ import { fmtMoney, fmtPct } from "../lib/format";
 import { Alert, Badge, Button, Card, Spinner, Textarea } from "../ui";
 import { OverrideForm, OverrideList } from "./ExtractionOverrides";
 
-const SECTIONS: Array<{ title: string; rows: Array<[string, (e: ExtractionDto) => string, string?]> }> = [
+/** [label, value, override path, shown-when]; a row with a shown-when test is a sub-line, indented. */
+type Row = [string, (e: ExtractionDto) => string, string?, ((e: ExtractionDto) => boolean)?];
+
+/** A Schedule 1 Part I line, shown under line 8 only when the return has an amount on it. */
+function s1(label: string, key: keyof NonNullable<ExtractionDto["schedule_1"]>): Row {
+  return [label, (e) => fmtMoney(e.schedule_1?.[key] ?? 0), `schedule_1.${key}`, (e) => Boolean(e.schedule_1?.[key])];
+}
+
+const SECTIONS: Array<{ title: string; rows: Row[] }> = [
   {
     title: "Income",
     rows: [
@@ -18,6 +26,14 @@ const SECTIONS: Array<{ title: string; rows: Array<[string, (e: ExtractionDto) =
       ["Social security (taxable)", (e) => fmtMoney(e.income.social_security_taxable), "income.social_security_taxable"],
       ["Capital gain or loss", (e) => fmtMoney(e.income.capital_gain), "income.capital_gain"],
       ["Schedule 1 additional income", (e) => fmtMoney(e.income.schedule_1_total), "income.schedule_1_total"],
+      s1("Taxable state and local refunds", "taxable_refunds"),
+      s1("Alimony received", "alimony"),
+      s1("Business (Schedule C)", "business"),
+      s1("Other gains or losses", "other_gains"),
+      s1("Rental, royalty, partnership, S corporation, trust (Schedule E)", "rental_partnership"),
+      s1("Farm (Schedule F)", "farm"),
+      s1("Unemployment compensation", "unemployment"),
+      s1("Other income", "other"),
       ["Total income", (e) => fmtMoney(e.income.total_income), "income.total_income"],
     ],
   },
@@ -189,11 +205,12 @@ export function ExtractionPanel({ job, onChanged }: { job: JobDetailDto; onChang
                 <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">{sec.title}</h3>
                 <table className="w-full text-sm">
                   <tbody>
-                    {sec.rows.map(([label, fn, path]) => {
+                    {sec.rows.map(([label, fn, path, shown]) => {
                       const o = path ? overridden.get(path) : undefined;
+                      if (shown && !shown(ex) && !o) return null;
                       return (
                         <tr key={label} className={o ? "border-t border-slate-100 bg-amber-50" : "border-t border-slate-100"}>
-                          <td className="py-1 pr-2 text-slate-600">
+                          <td className={shown ? "py-1 pl-4 pr-2 text-slate-500" : "py-1 pr-2 text-slate-600"}>
                             {label}
                             {o && (
                               <span className="ml-2" title={`Read as ${o.extractedValue === null ? "nothing" : fmtMoney(o.extractedValue)}; overridden by ${o.by}`}>

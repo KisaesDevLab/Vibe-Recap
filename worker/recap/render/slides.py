@@ -11,6 +11,8 @@ from typing import Any
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
+from .. import schedule1
+
 SLIDES = ["greeting", "income", "deductions", "tax", "result", "observations", "next"]
 WIDTH, HEIGHT = 1920, 1080
 
@@ -42,6 +44,16 @@ FILING_STATUS_TEXT = {
     "HOH": "Head of household",
     "QSS": "Qualifying surviving spouse",
 }
+SCHEDULE_1_LABEL = {
+    "taxable_refunds": "State tax refunds",
+    "alimony": "Alimony",
+    "business": "Business",
+    "other_gains": "Other gains",
+    "rental_partnership": "Rental & partnerships",
+    "farm": "Farm",
+    "unemployment": "Unemployment",
+    "other": "Other income",
+}
 OBS_LABEL = {
     "yoy_agi": "Adjusted gross income vs. last year",
     "yoy_total_tax": "Total tax vs. last year",
@@ -61,8 +73,10 @@ def income_bars(ex: dict[str, Any]) -> list[dict[str, Any]]:
         ("IRA & pensions", inc.get("ira_pensions", 0)),
         ("Social security", inc.get("social_security_taxable", 0)),
         ("Capital gain", inc.get("capital_gain", 0)),
-        ("Other (Sch. 1)", inc.get("schedule_1_total", 0)),
     ]
+    # Line 8 by kind when Schedule 1 foots to it, else one bar (Q69).
+    kinds = schedule1.breakdown(ex)
+    rows += [(SCHEDULE_1_LABEL[k], v) for k, v in kinds] or [("Other (Sch. 1)", inc.get("schedule_1_total", 0))]
     rows = [(k, int(v or 0)) for k, v in rows if int(v or 0) != 0]
     top = max((abs(v) for _k, v in rows), default=1) or 1
     return [{"label": k, "value": v, "text": money(v), "width": round(abs(v) / top * 100, 1), "negative": v < 0} for k, v in rows]

@@ -16,7 +16,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-SECTIONS = ("income", "adjustments", "deductions", "tax", "payments", "result", "extras", "prior_year")
+SECTIONS = ("income", "schedule_1", "adjustments", "deductions", "tax", "payments", "result", "extras", "prior_year")
 STATE_FIELDS = ("taxable_income", "tax", "payments", "refund", "amount_owed", "penalty")
 # Fields that are facts or computed, never figures a preparer types in.
 NOT_OVERRIDABLE = {"deductions.type", "tax.effective_rate", "prior_year.present", "prior_year.source", "extras.has_form_2210"}
