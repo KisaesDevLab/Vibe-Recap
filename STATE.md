@@ -101,6 +101,10 @@ total tax (verifier now feeds back into the retry loop), and the "tax year exact
 ## Releases
 
 - v0.1.0 (2026-09-05): first release, all nine phases.
+- v0.6.0 (2026-10-02): client sharing (Q73): a verified 7-day watch link through a Cloudflare
+  tunnel, one-time code by email or Twilio text, optional last-4 check, 5 sessions, stream only,
+  cooldown and lock; the first watch ticks Delivered. Migration 0010. Not yet tried against a real
+  tunnel, Emailit send to a client, or Twilio.
 - v0.5.0 (2026-10-01): UltraTax line-mapping fixes from a third real return (Q67); preparer
   overrides of misread figures (Q66); Schedule 1 by kind of income (Q69); verifier false
   positives fixed (Q70); router calls get an 8000-token output budget so Claude Sonnet 5.5's
