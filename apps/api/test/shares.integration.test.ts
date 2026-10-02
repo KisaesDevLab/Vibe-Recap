@@ -7,6 +7,8 @@ import { setSetting } from "../src/services/settings.js";
 import { sweepShares } from "../src/services/shares.js";
 import { runPurge } from "../src/services/purge.js";
 import { maskUrl } from "../src/logger.js";
+import { listenWatch } from "../src/watchListener.js";
+import type { AddressInfo } from "node:net";
 
 const available = await servicesAvailable();
 const WATCH = "https://watch.example.com";
@@ -242,6 +244,28 @@ describe.skipIf(!available)("client sharing (Q73)", () => {
     expect((await w2.post(`${newPath}/verify`, { code, last4: "2468" })).statusCode).toBe(200);
   });
 
+  it("text messages can come from the environment (the appliance's Email & SMS settings)", async () => {
+    await setSetting(ctx.db, "sms_provider", "", null);
+    await setSetting(ctx.db, "twilio_account_sid", "", null);
+    await setSetting(ctx.db, "twilio_auth_token", "", null);
+    await setSetting(ctx.db, "twilio_from", "", null);
+    expect((await admin.get("/api/settings/sharing")).json().status.channels.sms).toBe(false);
+    Object.assign(ctx.app.config, { SMS_PROVIDER: "twilio", TWILIO_ACCOUNT_SID: "AC" + "b".repeat(32), TWILIO_AUTH_TOKEN: "env-token", FROM_NUMBER: "+15550002222" });
+    try {
+      const view = (await admin.get("/api/settings/sharing")).json();
+      expect(view.status.channels.sms).toBe(true);
+      expect(view.envSms).toEqual({ provider: "twilio", accountSidSet: true, fromSet: true });
+      const jobId = await seedJob();
+      expect((await admin.post(`/api/jobs/${jobId}/shares`, { channel: "sms", contact: "5553334444", requireSecret: false })).statusCode).toBe(200);
+      expect(ctx.sms.last()).toMatchObject({ from: "+15550002222", authToken: "env-token", to: "+15553334444" });
+      // An explicit "Off" in Settings > Sharing wins over the environment.
+      await setSetting(ctx.db, "sms_provider", "none", null);
+      expect((await admin.get("/api/settings/sharing")).json().status.channels.sms).toBe(false);
+    } finally {
+      Object.assign(ctx.app.config, { SMS_PROVIDER: "", TWILIO_ACCOUNT_SID: "", TWILIO_AUTH_TOKEN: "", FROM_NUMBER: "" });
+    }
+  });
+
   it("a post from another origin is refused", async () => {
     const jobId = await seedJob();
     await admin.post(`/api/jobs/${jobId}/shares`, { channel: "email", contact: "five@example.net", requireSecret: false });
@@ -280,6 +304,31 @@ describe.skipIf(!available)("client sharing (Q73)", () => {
     const page = await watcher().get(path);
     expect(page.statusCode).toBe(410);
     expect(page.body).toContain("no longer available");
+  });
+
+  it("the watch-only listener serves the client routes and nothing else", async () => {
+    const jobId = await seedJob();
+    await admin.post(`/api/jobs/${jobId}/shares`, { channel: "email", contact: "eight@example.net", requireSecret: false });
+    const path = linkPath(ctx.email.last()!.text);
+    const server = await listenWatch(ctx.app, 0, "127.0.0.1");
+    const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+    try {
+      for (const p of ["/api/auth/me", "/api/setup/status", "/healthz", "/auth/status", "/", "/login", "/watch/short", `${path}/../../api/auth/me`, `${path}/%2e%2e/x`, `${path}/source.pdf`]) {
+        expect((await fetch(base + p)).status, p).toBe(404);
+      }
+      expect((await fetch(`${base}${path}`, { method: "DELETE" })).status).toBe(404);
+      expect((await fetch(`${base}/robots.txt`)).status).toBe(200);
+      const page = await fetch(base + path);
+      expect(page.status).toBe(200);
+      expect(await page.text()).toContain("Send my code");
+      const code = await fetch(`${base}${path}/code`, { method: "POST", headers: { "content-type": "application/json", "cf-connecting-ip": "198.51.100.7" }, body: "{}" });
+      expect(code.status).toBe(200);
+      const share = await shareOf(jobId);
+      const [sent] = await ctx.db.select().from(shareEvents).where(sql`${shareEvents.shareId} = ${share.id} and ${shareEvents.event} = 'code_sent'`);
+      expect(sent!.ip).toBe("198.51.100.7");
+    } finally {
+      await new Promise((r) => server.close(r));
+    }
   });
 
   it("the Twilio token is never exported, and share links are masked in logs", async () => {

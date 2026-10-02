@@ -26,7 +26,7 @@ const schema = z.object({
   SESSION_ABSOLUTE_DAYS: z.coerce.number().default(7),
   LOGIN_MAX_FAILURES: z.coerce.number().int().default(10),
   LOGIN_LOCKOUT_MINUTES: z.coerce.number().default(15),
-  RECAP_VERSION: z.string().default("0.6.0"),
+  RECAP_VERSION: z.string().default("0.6.1"),
   /** Run migrations at boot (default). The Vibe Appliance sets false and runs `migrate` explicitly. */
   MIGRATIONS_AUTO: bool.default(true),
   /** Comma-separated list of allowed Origin values for state-changing requests; empty = same-origin only. */
@@ -41,10 +41,15 @@ const schema = z.object({
    * served by the Cloudflare tunnel. Settings > Sharing can hold it instead. Empty in both = no sharing.
    */
   SHARE_PUBLIC_URL: z.string().default(""),
+  /** The watch-only listener the public watch host is proxied to (watchListener.ts). 0 = off. */
+  WATCH_PORT: z.coerce.number().int().min(0).default(3001),
   /** Twilio for share links and codes by text message (Q73). Settings > Sharing can hold the same values. */
   TWILIO_ACCOUNT_SID: z.string().default(""),
   TWILIO_AUTH_TOKEN: z.string().default(""),
   TWILIO_FROM: z.string().default(""),
+  /** The Vibe Appliance's Email & SMS settings (appliance.env): used when Settings > Sharing leaves the provider and sender to the environment. */
+  SMS_PROVIDER: z.string().default(""),
+  FROM_NUMBER: z.string().default(""),
   TWILIO_API_URL: z.string().default("https://api.twilio.com"),
 });
 

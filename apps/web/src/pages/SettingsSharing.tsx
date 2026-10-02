@@ -7,13 +7,14 @@ interface SharingSettingsResponse {
   settings: {
     share_enabled: boolean;
     share_public_url: string;
-    sms_provider: "none" | "twilio";
+    sms_provider: "" | "none" | "twilio";
     twilio_account_sid: string;
     twilio_from: string;
   };
   authTokenSet: boolean;
   authTokenSource: "settings" | "env" | null;
   authTokenMasked: string | null;
+  envSms: { provider: string; accountSidSet: boolean; fromSet: boolean };
   effectivePublicUrl: string;
   envPublicUrl: string;
   status: {
@@ -115,8 +116,14 @@ export function SettingsSharingPage() {
         <div className="space-y-4">
           <Card title="Text messages (Twilio)" actions={st.channels.sms ? <Badge tone="green">on</Badge> : <Badge tone="slate">{(st.channelReasons.sms ?? "off").toLowerCase()}</Badge>}>
             <div className="space-y-3">
-              <Field label="Provider">
+              <Field
+                label="Provider"
+                hint="On the Vibe Appliance, Twilio entered once under Configuration › Email & SMS reaches Recap through the environment; leave the fields below blank to use it."
+              >
                 <Select name="sms_provider" defaultValue={s.sms_provider}>
+                  <option value="">
+                    From the environment ({data.envSms.provider === "twilio" ? `Twilio${data.envSms.accountSidSet && data.envSms.fromSet ? "" : ", incomplete"}` : "off"})
+                  </option>
                   <option value="none">Off</option>
                   <option value="twilio">Twilio</option>
                 </Select>

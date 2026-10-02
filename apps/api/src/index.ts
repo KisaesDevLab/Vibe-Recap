@@ -7,6 +7,7 @@ import { createLogger } from "./logger.js";
 import { Storage } from "./services/storage.js";
 import { orphanCheck } from "./services/purge.js";
 import { registerTaskClasses } from "./services/airouter.js";
+import { listenWatch } from "./watchListener.js";
 
 async function main() {
   const config = loadConfig();
@@ -27,8 +28,10 @@ async function main() {
     .catch((err) => app.log.warn({ err }, "ai router registration failed"));
   await orphanCheck(app).catch((err) => app.log.error({ err }, "orphan check failed"));
 
+  let watchServer: Awaited<ReturnType<typeof listenWatch>> | null = null;
   const shutdown = async (signal: string) => {
     app.log.info({ signal }, "shutting down");
+    if (watchServer) await new Promise((resolve) => watchServer!.close(resolve));
     await app.close();
     await redis.quit();
     await close();
@@ -38,6 +41,11 @@ async function main() {
   process.on("SIGINT", () => void shutdown("SIGINT"));
 
   await app.listen({ port: config.PORT, host: config.HOST });
+  // Client sharing (Q73): the public watch host is proxied to this port, which serves /watch/* only.
+  if (config.WATCH_PORT > 0) {
+    watchServer = await listenWatch(app, config.WATCH_PORT, config.HOST);
+    app.log.info({ port: config.WATCH_PORT }, "watch-only listener");
+  }
 }
 
 main().catch((err) => {

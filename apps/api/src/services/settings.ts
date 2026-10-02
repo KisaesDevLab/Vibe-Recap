@@ -37,10 +37,10 @@ export const SETTING_DEFAULTS = {
   // Client sharing (Q73): a verified, time-limited watch link on the public watch host. Off by default.
   share_enabled: false,
   share_public_url: "" as string, // empty = SHARE_PUBLIC_URL env
-  sms_provider: "none" as "none" | "twilio",
+  sms_provider: "" as "" | "none" | "twilio", // "" = SMS_PROVIDER env (the appliance's Email & SMS setting)
   twilio_account_sid: "" as string, // empty = TWILIO_ACCOUNT_SID env
   twilio_auth_token: "" as string, // empty = TWILIO_AUTH_TOKEN env
-  twilio_from: "" as string, // E.164 number or Messaging Service SID (MG...); empty = TWILIO_FROM env
+  twilio_from: "" as string, // E.164 number or Messaging Service SID (MG...); empty = TWILIO_FROM, then FROM_NUMBER env
 };
 
 /** Settings that never leave the box in an export and are never imported. */

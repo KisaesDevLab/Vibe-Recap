@@ -69,6 +69,9 @@ export class TwilioClient implements SmsClient {
 
 export interface SmsConfig {
   enabled: boolean;
+  /** The provider in effect and where it came from: Settings > Sharing, or the environment (on the appliance, its Email & SMS page). */
+  provider: "none" | "twilio";
+  providerSource: "settings" | "env";
   accountSid: string;
   authTokenSet: boolean;
   authTokenSource: "settings" | "env" | null;
@@ -81,9 +84,13 @@ export async function smsConfig(app: FastifyInstance): Promise<SmsConfig & { aut
   const s = await getAllSettings(app.db);
   const accountSid = (s.twilio_account_sid || app.config.TWILIO_ACCOUNT_SID).trim();
   const authToken = (s.twilio_auth_token || app.config.TWILIO_AUTH_TOKEN).trim();
-  const from = (s.twilio_from || app.config.TWILIO_FROM).trim();
+  const from = (s.twilio_from || app.config.TWILIO_FROM || app.config.FROM_NUMBER).trim();
+  const providerSource = s.sms_provider ? ("settings" as const) : ("env" as const);
+  const provider: "none" | "twilio" = (s.sms_provider || app.config.SMS_PROVIDER.trim().toLowerCase()) === "twilio" ? "twilio" : "none";
   const base = {
     enabled: false,
+    provider,
+    providerSource,
     accountSid,
     authToken,
     authTokenSet: !!authToken,
@@ -91,7 +98,7 @@ export async function smsConfig(app: FastifyInstance): Promise<SmsConfig & { aut
     from,
     reason: null as string | null,
   };
-  if (s.sms_provider !== "twilio") return { ...base, reason: "Text messages are off" };
+  if (provider !== "twilio") return { ...base, reason: "Text messages are off" };
   if (!/^AC[0-9a-f]{32}$/i.test(accountSid)) return { ...base, reason: "No valid Twilio account SID" };
   if (!authToken) return { ...base, reason: "No Twilio auth token" };
   if (!/^\+[1-9]\d{6,14}$/.test(from) && !/^MG[0-9a-f]{32}$/i.test(from)) return { ...base, reason: "No valid sending number or messaging service" };

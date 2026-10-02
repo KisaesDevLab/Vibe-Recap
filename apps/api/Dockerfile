@@ -43,6 +43,6 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh && mkdir -p /data && chown node
     done
 # Starts as root only to fix /data ownership on a fresh bind mount, then drops to uid 1000 (node).
 # The worker container runs as the same uid so both can read the master key and blobs.
-EXPOSE 3000
+EXPOSE 3000 3001
 ENTRYPOINT ["tini", "--", "docker-entrypoint.sh"]
 CMD ["serve"]

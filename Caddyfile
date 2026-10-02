@@ -41,8 +41,9 @@ import /etc/caddy/tls/{$TLS_MODE:lan}.caddy
 
 # Client watch host (Q73, docs/sharing.md). Plain HTTP on 8088, published on no host port: the
 # only thing that reaches it is the cloudflared container, which terminates TLS at Cloudflare.
-# It serves /watch/* and nothing else, so the staff UI and /api/* are not on the internet.
-# Cloudflare's view of the client address replaces the tunnel's own in X-Forwarded-For.
+# It serves /watch/* and nothing else, so the staff UI and /api/* are not on the internet, and
+# forwards to the api's watch-only listener (3001), which refuses everything but the client watch
+# routes itself. Cloudflare's view of the client address replaces the tunnel's own.
 http://:8088 {
 	header {
 		X-Content-Type-Options nosniff
@@ -53,7 +54,7 @@ http://:8088 {
 		-Server
 	}
 	handle /watch/* {
-		reverse_proxy api:3000 {
+		reverse_proxy api:3001 {
 			header_up X-Forwarded-For {http.request.header.Cf-Connecting-Ip}
 		}
 	}

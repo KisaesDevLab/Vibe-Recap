@@ -147,6 +147,7 @@ export async function shareRoutes(app: FastifyInstance) {
       authTokenSet: sms.authTokenSet,
       authTokenSource: sms.authTokenSource,
       authTokenMasked: s.twilio_auth_token ? `…${s.twilio_auth_token.slice(-4)}` : null,
+      envSms: { provider: app.config.SMS_PROVIDER.trim().toLowerCase() || "none", accountSidSet: !!app.config.TWILIO_ACCOUNT_SID, fromSet: !!(app.config.TWILIO_FROM || app.config.FROM_NUMBER) },
       effectivePublicUrl: status.publicUrl,
       envPublicUrl: app.config.SHARE_PUBLIC_URL,
       status,
@@ -160,7 +161,7 @@ export async function shareRoutes(app: FastifyInstance) {
       .object({
         share_enabled: z.boolean().optional(),
         share_public_url: z.string().max(200).optional(),
-        sms_provider: z.enum(["none", "twilio"]).optional(),
+        sms_provider: z.enum(["", "none", "twilio"]).optional(),
         twilio_account_sid: z.string().max(64).optional(),
         /** Omit to keep the stored token; empty string clears it. */
         twilio_auth_token: z.string().max(128).optional(),
