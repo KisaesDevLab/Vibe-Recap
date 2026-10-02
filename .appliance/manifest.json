@@ -45,6 +45,11 @@
         "name": "auth",
         "path": "/auth/*",
         "upstream": "vibe-recap-api:3000"
+      },
+      {
+        "name": "watch",
+        "path": "/watch/*",
+        "upstream": "vibe-recap-api:3000"
       }
     ]
   },

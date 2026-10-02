@@ -28,9 +28,41 @@
 	handle /readyz {
 		reverse_proxy api:3000
 	}
+	# Client watch page (Q73), also reachable on the staff host for testing on the LAN.
+	handle /watch/* {
+		reverse_proxy api:3000
+	}
 	handle {
 		reverse_proxy web:8080
 	}
 }
 
 import /etc/caddy/tls/{$TLS_MODE:lan}.caddy
+
+# Client watch host (Q73, docs/sharing.md). Plain HTTP on 8088, published on no host port: the
+# only thing that reaches it is the cloudflared container, which terminates TLS at Cloudflare.
+# It serves /watch/* and nothing else, so the staff UI and /api/* are not on the internet.
+# Cloudflare's view of the client address replaces the tunnel's own in X-Forwarded-For.
+http://:8088 {
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy no-referrer
+		Strict-Transport-Security "max-age=31536000"
+		X-Robots-Tag "noindex, nofollow"
+		-Server
+	}
+	handle /watch/* {
+		reverse_proxy api:3000 {
+			header_up X-Forwarded-For {http.request.header.Cf-Connecting-Ip}
+		}
+	}
+	handle /robots.txt {
+		respond "User-agent: *
+Disallow: /
+" 200
+	}
+	handle {
+		respond 404
+	}
+}

@@ -4,7 +4,9 @@
 # Networks:
 #   frontend  caddy <-> web/api
 #   backend   internal only (no internet): api, worker, postgres, redis, ollama
-#   egress    internet access: caddy (ACME), api (api.emailit.com when outgoing email is on), ollama (model pulls)
+#   egress    internet access: caddy (ACME), api (api.emailit.com when outgoing email is on,
+#             api.twilio.com when text messages are on), ollama (model pulls)
+#   cloudflared (profile `share`, client sharing) sits on frontend and dials out to Cloudflare.
 # The worker is attached to `backend` only, so it has no route to the internet.
 
 x-logging: &default-logging
@@ -28,6 +30,20 @@ services:
       - caddy_config:/config
     networks: [frontend, egress]
     depends_on: [web, api]
+    logging: *default-logging
+
+  # Client sharing (Q73, docs/sharing.md): an outbound-only Cloudflare tunnel to Caddy's watch site
+  # (caddy:8088), which serves /watch/* and nothing else. Off unless COMPOSE_PROFILES includes
+  # `share`. In the Cloudflare dashboard the public hostname's service is http://caddy:8088.
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    profiles: [share]
+    restart: unless-stopped
+    command: ["tunnel", "--no-autoupdate", "run"]
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
+    networks: [frontend]
+    depends_on: [caddy]
     logging: *default-logging
 
   web:
@@ -65,6 +81,12 @@ services:
       # Outgoing email (Q48): optional; Settings > Email can also hold the key.
       EMAILIT_API_KEY: ${EMAILIT_API_KEY:-}
       PUBLIC_URL: ${PUBLIC_URL:-}
+      # Client sharing (Q73): the watch host's public address and, optionally, Twilio for texts.
+      # Settings > Sharing can hold the same values.
+      SHARE_PUBLIC_URL: ${SHARE_PUBLIC_URL:-}
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
+      TWILIO_FROM: ${TWILIO_FROM:-}
       # Single sign-on through Vibe Auth (Q57, docs/sso.md). Off until VIBE_AUTH_MODE is both or
       # oidc_only; the VIBE_OIDC_* block is what the Vibe Auth broker returns at registration.
       # Empty counts as unset.
