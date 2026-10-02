@@ -9,6 +9,7 @@ import { buildApp } from "../src/app.js";
 import { Storage } from "../src/services/storage.js";
 import type { StageResult, Stager } from "../src/services/queue.js";
 import { EmailError, type EmailClient, type OutboundEmail } from "../src/services/email.js";
+import { SmsError, type OutboundSms, type SmsClient } from "../src/services/sms.js";
 import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -38,6 +39,7 @@ export interface TestContext {
   storage: Storage;
   stager: FakeStager;
   email: FakeEmailClient;
+  sms: FakeSmsClient;
   dataDir: string;
   close: () => Promise<void>;
 }
@@ -84,6 +86,20 @@ export class FakeEmailClient implements EmailClient {
   }
 }
 
+/** Records every text message instead of calling Twilio. */
+export class FakeSmsClient implements SmsClient {
+  sent: OutboundSms[] = [];
+  fail: string | null = null;
+  async send(msg: OutboundSms) {
+    if (this.fail) throw new SmsError(this.fail, 400);
+    this.sent.push(msg);
+    return { id: `SM_test_${this.sent.length}` };
+  }
+  last() {
+    return this.sent[this.sent.length - 1];
+  }
+}
+
 export async function createTestContext(
   overrides: Partial<Config> = {},
   deps: { emailClient?: EmailClient; /** Single sign-on env (VIBE_AUTH_MODE, VIBE_OIDC_*); empty = local mode. */ authEnv?: NodeJS.ProcessEnv } = {},
@@ -108,7 +124,8 @@ export async function createTestContext(
   const stager = new FakeStager(storage);
   const email = (deps.emailClient as FakeEmailClient | undefined) ?? new FakeEmailClient();
   // Never the developer's own environment: a stray VIBE_AUTH_MODE would change every suite.
-  const app = await buildApp({ config, db, redis, storage, stager, emailClient: email, authEnv: deps.authEnv ?? {} });
+  const sms = new FakeSmsClient();
+  const app = await buildApp({ config, db, redis, storage, stager, emailClient: email, smsClient: sms, authEnv: deps.authEnv ?? {} });
   await app.ready();
   return {
     app,
@@ -118,6 +135,7 @@ export async function createTestContext(
     storage,
     stager,
     email,
+    sms,
     dataDir,
     close: async () => {
       await app.close();

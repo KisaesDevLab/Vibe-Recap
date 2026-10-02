@@ -1,7 +1,7 @@
 /**
  * Outgoing email (QUESTIONS.md Q48): transactional messages to the firm's own users through the
- * Emailit REST API. Recap never emails clients; the only messages are invites, password-reset
- * links, password-changed notices, and the admin's test message.
+ * Emailit REST API: invites, password-reset links, password-changed notices, and the admin's test
+ * message. The only messages to a client are a share's link and one-time code (Q73, shares.ts).
  *
  * Contract (Emailit v2, https://emailit.com/docs/api-reference/emails/send):
  *   POST {EMAILIT_API_URL}/v2/emails

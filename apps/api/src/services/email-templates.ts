@@ -1,6 +1,7 @@
 /**
- * The four messages Recap sends, as plain text plus a small HTML twin. Every value is escaped;
- * nothing from a tax return is ever part of a message. Firm name and URLs only.
+ * The messages Recap sends, as plain text plus a small HTML twin. Every value is escaped;
+ * nothing from a tax return is ever part of a message. Firm name and URLs only. Four go to firm
+ * users; the share link and the share code (Q73) go to the contact a preparer entered for a client.
  */
 import type { EmailContent } from "./email.js";
 
@@ -58,6 +59,28 @@ export function passwordChangedEmail(o: { firmName: string; url: string }): Emai
     ["The password for your Vibe Recap account was just changed and every other sign-in was ended.", "If you made this change, nothing else is needed. If you did not, tell your administrator right away so they can secure the account."],
     o.url ? { label: "Open Vibe Recap", url: o.url } : undefined,
   );
+}
+
+/** To a client (Q73): the watch link. No name, no figures; the link alone plays nothing. */
+export function shareLinkEmail(o: { firmName: string; url: string; expires: string }): EmailContent {
+  const brand = o.firmName || "Your tax preparer";
+  return wrap(
+    o.firmName,
+    `Your tax return summary video from ${brand}`,
+    [
+      `${brand} has prepared a short video that walks through your tax return in plain English.`,
+      "Open the link below. To confirm it is you, we will email a one-time code to this address before the video plays.",
+      `The link expires ${o.expires}. If you were not expecting this message, you can ignore it.`,
+    ],
+    { label: "Watch your video", url: o.url },
+    `Sent by ${brand}.`,
+  );
+}
+
+/** To a client (Q73): the one-time code for a share. */
+export function shareCodeEmail(o: { firmName: string; code: string; minutes: number }): EmailContent {
+  const brand = o.firmName || "Your tax preparer";
+  return wrap(o.firmName, `Your verification code is ${o.code}`, [`Enter ${o.code} on the video page to watch your tax return summary from ${brand}.`, `The code works once and expires in ${o.minutes} minutes. If you did not ask for it, you can ignore this message.`], undefined, `Sent by ${brand}.`);
 }
 
 export function testEmail(o: { firmName: string; url: string; sentBy: string }): EmailContent {

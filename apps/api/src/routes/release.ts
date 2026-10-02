@@ -1,5 +1,6 @@
 /**
- * Release and download (Phase 7). Delivery is download only (L11): no share links, no portal.
+ * Release and download (Phase 7). Delivery is download (L11) or, since Q73, a verified share
+ * link (routes/shares.ts, routes/watch.ts). No portal.
  * Every download writes one audit row with user, IP, file kind, and sha256.
  */
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";

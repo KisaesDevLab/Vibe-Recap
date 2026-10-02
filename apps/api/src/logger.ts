@@ -38,10 +38,20 @@ export const REDACT_PATHS = [
   "*.notes",
 ];
 
+/** URLs that carry a bearer secret in the path (client share links, Q73) are logged without it. */
+export function maskUrl(url: string | undefined): string | undefined {
+  return url?.replace(/^\/watch\/[^/?#]+/, "/watch/[token]");
+}
+
 export function loggerOptions(level: string): LoggerOptions {
   return {
     level,
     redact: { paths: REDACT_PATHS, censor: "[redacted]" },
+    serializers: {
+      req(req: { method?: string; url?: string; host?: string; ip?: string; socket?: { remotePort?: number } }) {
+        return { method: req.method, url: maskUrl(req.url), host: req.host, remoteAddress: req.ip, remotePort: req.socket?.remotePort };
+      },
+    },
     base: { service: "recap-api" },
   };
 }

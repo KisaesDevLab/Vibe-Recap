@@ -408,3 +408,73 @@ export const jobFeedback = pgTable(
 );
 
 export type JobFeedback = typeof jobFeedback.$inferSelect;
+
+// ---------------------------------------------------------------------------
+// Client sharing (Q73). A preparer shares an approved video with the client through a link on
+// the public watch host. The link alone plays nothing: the client asks for a one-time code, which
+// goes to the contact the preparer entered, and optionally answers the last four digits of their
+// SSN. Only hashes of the link token, the code and the last four are stored; the contact is
+// wrapped with the master key and wiped when the share ends.
+// ---------------------------------------------------------------------------
+
+export const jobShares = pgTable(
+  "job_shares",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    jobId: uuid("job_id")
+      .notNull()
+      .references(() => jobs.id, { onDelete: "cascade" }),
+    /** sha256 of the link token; the token itself is only ever in the message the client receives. */
+    tokenHash: text("token_hash").notNull().unique(),
+    channel: text("channel").notNull(), // email | sms
+    /** The email address or phone number, wrapped with the master key; null once wiped. */
+    contactWrapped: text("contact_wrapped"),
+    contactMasked: text("contact_masked").notNull(),
+    /** Argon2id of the last four digits of the SSN, when the preparer asked for that check. */
+    secretHash: text("secret_hash"),
+    secretRequired: boolean("secret_required").notNull().default(false),
+    maxSessions: integer("max_sessions").notNull(),
+    sessionsUsed: integer("sessions_used").notNull().default(0),
+    failedAttempts: integer("failed_attempts").notNull().default(0),
+    codesSent: integer("codes_sent").notNull().default(0),
+    cooldownUntil: timestamp("cooldown_until", { withTimezone: true }),
+    lockedAt: timestamp("locked_at", { withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    revokedByLabel: text("revoked_by_label"),
+    /** Set when the share ended (expired, revoked, job purged) and its contact and secret were wiped. */
+    wipedAt: timestamp("wiped_at", { withTimezone: true }),
+    firstViewedAt: timestamp("first_viewed_at", { withTimezone: true }),
+    createdBy: uuid("created_by").references(() => users.id),
+    createdByLabel: text("created_by_label").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  },
+  (t) => [index("job_shares_job_idx").on(t.jobId), index("job_shares_expires_idx").on(t.expiresAt)],
+);
+
+/**
+ * What happened on a share: the job page's client-activity timeline. IP and browser are kept for
+ * the life of the job (Q73) and nulled when the job is purged; the rest stays.
+ */
+export const shareEvents = pgTable(
+  "share_events",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    shareId: uuid("share_id")
+      .notNull()
+      .references(() => jobShares.id, { onDelete: "cascade" }),
+    jobId: uuid("job_id")
+      .notNull()
+      .references(() => jobs.id, { onDelete: "cascade" }),
+    at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+    event: text("event").notNull(),
+    actorLabel: text("actor_label"),
+    ip: text("ip"),
+    userAgent: text("user_agent"),
+    meta: jsonb("meta").$type<Record<string, unknown>>().notNull().default({}),
+  },
+  (t) => [index("share_events_share_idx").on(t.shareId), index("share_events_job_idx").on(t.jobId)],
+);
+
+export type JobShare = typeof jobShares.$inferSelect;
+export type ShareEvent = typeof shareEvents.$inferSelect;

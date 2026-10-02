@@ -37,6 +37,8 @@ async function authPlugin(app: FastifyInstance, opts: AuthPluginOptions) {
   const allowedOrigins = app.config.ALLOWED_ORIGIN.split(",").map((s) => s.trim().replace(/\/$/, "")).filter(Boolean);
   app.addHook("onRequest", async (req, reply) => {
     if (!allowedOrigins.length || !STATE_CHANGING.has(req.method)) return;
+    // The client watch page (Q73) posts from the public watch host; routes/watch.ts checks its origin.
+    if (req.url.startsWith("/watch/")) return;
     const origin = req.headers.origin;
     if (!origin) return; // non-browser clients (no Origin header) are governed by the session + CSRF checks
     if (!allowedOrigins.includes(origin.replace(/\/$/, ""))) {

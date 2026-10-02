@@ -28,11 +28,14 @@ import { auditRoutes } from "./routes/audit.js";
 import { settingsRoutes } from "./routes/settings.js";
 import { revisionRoutes } from "./routes/revisions.js";
 import { feedbackRoutes } from "./routes/feedback.js";
+import { shareRoutes } from "./routes/shares.js";
+import { watchRoutes } from "./routes/watch.js";
 import type { Storage } from "./services/storage.js";
 import { Queues, type Stager } from "./services/queue.js";
 import { StagingService } from "./services/staging.js";
 import { startCron } from "./services/cron.js";
 import { EmailitClient, type EmailClient } from "./services/email.js";
+import { TwilioClient, type SmsClient } from "./services/sms.js";
 import { registerVibeAuth } from "./lib/vibeAuth.js";
 
 declare module "fastify" {
@@ -45,6 +48,7 @@ declare module "fastify" {
     queues: Queues;
     staging: StagingService;
     emailClient: EmailClient;
+    smsClient: SmsClient;
   }
 }
 
@@ -59,6 +63,8 @@ export interface AppDeps {
   cron?: boolean;
   /** Override the outgoing-email client (tests use a fake that records messages). */
   emailClient?: EmailClient;
+  /** Override the text-message client (tests use a fake that records messages). */
+  smsClient?: SmsClient;
   /** Where single sign-on reads VIBE_AUTH_MODE / VIBE_OIDC_* from (tests pass their own). Default: process.env. */
   authEnv?: NodeJS.ProcessEnv;
 }
@@ -91,6 +97,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   );
 
   app.decorate("emailClient", deps.emailClient ?? new EmailitClient(deps.config.EMAILIT_API_URL));
+  app.decorate("smsClient", deps.smsClient ?? new TwilioClient(deps.config.TWILIO_API_URL));
 
   await app.register(cookie);
   await app.register(multipart, { limits: { fileSize: 2 * 1024 * 1024 * 1024, files: 200, fields: 10 } });
@@ -139,6 +146,8 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   await app.register(settingsRoutes);
   await app.register(revisionRoutes);
   await app.register(feedbackRoutes);
+  await app.register(shareRoutes);
+  await app.register(watchRoutes);
 
   const tasks = deps.cron ? startCron(app) : [];
   app.addHook("onClose", async () => {

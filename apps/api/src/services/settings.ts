@@ -34,10 +34,17 @@ export const SETTING_DEFAULTS = {
   email_from_name: "" as string, // display name; blank = firm name
   email_reply_to: "" as string,
   public_url: "" as string, // empty = PUBLIC_URL env, then ALLOWED_ORIGIN, then the request's origin
+  // Client sharing (Q73): a verified, time-limited watch link on the public watch host. Off by default.
+  share_enabled: false,
+  share_public_url: "" as string, // empty = SHARE_PUBLIC_URL env
+  sms_provider: "none" as "none" | "twilio",
+  twilio_account_sid: "" as string, // empty = TWILIO_ACCOUNT_SID env
+  twilio_auth_token: "" as string, // empty = TWILIO_AUTH_TOKEN env
+  twilio_from: "" as string, // E.164 number or Messaging Service SID (MG...); empty = TWILIO_FROM env
 };
 
 /** Settings that never leave the box in an export and are never imported. */
-export const SECRET_SETTING_KEYS = ["emailit_api_key"] as const satisfies readonly SettingKey[];
+export const SECRET_SETTING_KEYS = ["emailit_api_key", "twilio_auth_token"] as const satisfies readonly SettingKey[];
 
 export type SettingKey = keyof typeof SETTING_DEFAULTS;
 export type SettingsMap = { [K in SettingKey]: (typeof SETTING_DEFAULTS)[K] };

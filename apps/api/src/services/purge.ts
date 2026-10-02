@@ -21,6 +21,7 @@ import { clients, extractionOverrides, files, jobEvents, jobs, type Client, type
 import { audit, SYSTEM_RETENTION, type Actor } from "./audit.js";
 import { getAllSettings } from "./settings.js";
 import { heldJobIds } from "../routes/feedback.js";
+import { purgeJobShares } from "./shares.js";
 
 const SOURCE_KINDS: FileKind[] = ["source", "prior"];
 const EXTRACTION_KINDS: FileKind[] = ["extraction", "script", "verification", "ai_exchange"];
@@ -155,6 +156,9 @@ export async function runPurge(
         .update(extractionOverrides)
         .set({ value: null, extractedValue: null, valuesPurgedAt: now })
         .where(and(eq(extractionOverrides.jobId, jobId), isNull(extractionOverrides.valuesPurgedAt)));
+      // Client shares (Q73): the contact and last-4 hash go now, and the client's IP and browser
+      // leave the timeline; the event history itself stays, like the audit log.
+      await purgeJobShares(app, jobId, now);
       await app.db.insert(jobEvents).values({ jobId, status: "purged", message: `all files purged by ${actor.label}` });
       purgedJobs++;
     }

@@ -36,6 +36,16 @@ const schema = z.object({
   EMAILIT_API_URL: z.string().default("https://api.emailit.com"),
   /** Public URL of this install for links in emails, e.g. https://recap.yourfirm.com. Falls back to ALLOWED_ORIGIN, then the request. */
   PUBLIC_URL: z.string().default(""),
+  /**
+   * Client sharing (Q73): the public address of the watch host, e.g. https://watch.yourfirm.com,
+   * served by the Cloudflare tunnel. Settings > Sharing can hold it instead. Empty in both = no sharing.
+   */
+  SHARE_PUBLIC_URL: z.string().default(""),
+  /** Twilio for share links and codes by text message (Q73). Settings > Sharing can hold the same values. */
+  TWILIO_ACCOUNT_SID: z.string().default(""),
+  TWILIO_AUTH_TOKEN: z.string().default(""),
+  TWILIO_FROM: z.string().default(""),
+  TWILIO_API_URL: z.string().default("https://api.twilio.com"),
 });
 
 export type Config = z.infer<typeof schema>;

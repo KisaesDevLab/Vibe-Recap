@@ -438,3 +438,55 @@ export interface AiExchangesResponse {
   enabled: boolean;
   runs: AiExchangeRunDto[];
 }
+
+// ---------------------------------------------------------------------------
+// Client sharing (Q73): verified, time-limited watch links
+// ---------------------------------------------------------------------------
+
+export type ShareChannel = "email" | "sms";
+export type ShareState = "active" | "exhausted" | "locked" | "revoked" | "expired";
+
+export interface ShareDto {
+  id: string;
+  channel: ShareChannel;
+  contactMasked: string;
+  secretRequired: boolean;
+  state: ShareState;
+  createdAt: string;
+  createdByLabel: string;
+  expiresAt: string;
+  maxSessions: number;
+  sessionsUsed: number;
+  failedAttempts: number;
+  cooldownUntil: string | null;
+  lockedAt: string | null;
+  revokedAt: string | null;
+  revokedByLabel: string | null;
+  /** The contact and last-4 hash were wiped (share expired or job purged); re-issue needs them typed again. */
+  wiped: boolean;
+  firstViewedAt: string | null;
+}
+
+export interface ShareEventDto {
+  id: number;
+  shareId: string;
+  at: string;
+  event: string;
+  actorLabel: string | null;
+  ip: string | null;
+  userAgent: string | null;
+  meta: Record<string, unknown>;
+}
+
+export interface SharingAvailabilityDto {
+  enabled: boolean;
+  reason: string | null;
+  channels: { email: boolean; sms: boolean };
+  channelReasons: { email: string | null; sms: string | null };
+}
+
+export interface SharesResponse {
+  sharing: SharingAvailabilityDto;
+  shares: ShareDto[];
+  events: ShareEventDto[];
+}

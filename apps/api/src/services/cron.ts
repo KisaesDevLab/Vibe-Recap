@@ -1,6 +1,7 @@
 import cron, { type ScheduledTask } from "node-cron";
 import type { FastifyInstance } from "fastify";
 import { runPurge } from "./purge.js";
+import { sweepShares } from "./shares.js";
 
 /** Scheduled jobs inside the API. Every job logs start/finish with counts only. */
 export function startCron(app: FastifyInstance): ScheduledTask[] {
@@ -13,6 +14,13 @@ export function startCron(app: FastifyInstance): ScheduledTask[] {
         if (removed) app.log.info({ removed }, "staging sweep");
       } catch (err) {
         app.log.error({ err }, "staging sweep failed");
+      }
+      // Client shares past their 7 days lose their contact and last-4 hash (Q73).
+      try {
+        const wiped = await sweepShares(app);
+        if (wiped) app.log.info({ wiped }, "share sweep");
+      } catch (err) {
+        app.log.error({ err }, "share sweep failed");
       }
     }),
   );
