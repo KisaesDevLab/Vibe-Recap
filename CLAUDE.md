@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Operational notes for Claude Code working in this repo. Read this first, then `docs/PLAN.md`, then `docs/PHASES.md`, then `STATE.md`.
 
-> **Current state (2026-10-02):** v0.6.0 tagged: client sharing, a verified 7-day watch link through a Cloudflare tunnel (Q73, `docs/sharing.md`). v0.5.0: the AI exchanges viewer (Q72) and the router output budget for reasoning models (Q71), Schedule 1 by kind of income (Q69), two verifier false-positive fixes (Q70), extraction overrides (Q66) and the UltraTax line-mapping fixes from a third real return (Q67). Earlier: all nine phases built and verified (v0.1.0 was the first release);
+> **Current state (2026-10-02):** v0.6.1 tagged: client sharing, a verified 7-day watch link through a Cloudflare tunnel (Q73, `docs/sharing.md`), with the watch host published by the Vibe Appliance as a `watch` surface (Q74). v0.5.0: the AI exchanges viewer (Q72) and the router output budget for reasoning models (Q71), Schedule 1 by kind of income (Q69), two verifier false-positive fixes (Q70), extraction overrides (Q66) and the UltraTax line-mapping fixes from a third real return (Q67). Earlier: all nine phases built and verified (v0.1.0 was the first release);
 > it adds optional single sign-on through Vibe Auth (Q57 to Q62), verified in a real browser against a real authentik on the dev box, not yet registered on an appliance. Source is
 > public at `github.com/KisaesDevLab/Vibe-Recap`; images publish to GHCR from `.github/workflows/publish.yml`
 > on every push to `main` (`latest`, `sha-*`) and on `v*.*.*` tags. Read `STATE.md` for what changed after
@@ -222,8 +222,12 @@ Never commit a real tax return. `tests/fixtures/` contains synthetic 1040 packag
 - **The vibe-auth stores hand `Date` values to `$1` SQL**, which postgres.js `unsafe()` does not
   serialize; `textParam()` in `src/lib/vibeAuth.ts` sends everything as text. The package also pulls
   in Express as a peer; nothing loads it.
-- **The watch host serves `/watch/*` only.** Caddy's `http://:8088` site is what the Cloudflare
-  tunnel reaches; everything else there is a 404. The watch page is HTML rendered by
+- **The watch host serves `/watch/*` only.** It is proxied to the api's watch-only listener
+  (`src/watchListener.ts`, `WATCH_PORT` 3001), which passes only the exact client routes to the
+  app; never point a watch host at port 3000. Standalone, Caddy's `http://:8088` site is what the
+  Cloudflare tunnel reaches; on the appliance it is the manifest's `watch` surface, whose URL
+  arrives as `SHARE_PUBLIC_URL` (`@SURFACE_URL_WATCH@`). Add a client route to `WATCH_ROUTE`
+  there or it 404s on the public host. The watch page is HTML rendered by
   `routes/watch.ts` (nonce CSP), not the React app. `/watch/` is outside `/api/`, so the session
   hook does not cover it and the auth plugin's origin allow-list skips it; `watch.ts` checks the
   origin itself. The share token is a bearer secret in the path: `logger.ts::maskUrl` keeps it out

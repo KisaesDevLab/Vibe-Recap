@@ -37,22 +37,46 @@ the preparer creates a new share.
 
 ## Network
 
-The staff UI stays on the LAN or Tailscale. Only the watch page reaches the internet, through an
-outbound-only Cloudflare tunnel; no router port is opened.
+The watch host is a hostname of its own that reaches only the API's **watch-only listener**
+(`WATCH_PORT`, default 3001). That listener hands the app nothing but the exact client routes
+(the page, its two posts, the video, the captions) and answers 404 to everything else, `/api/*`,
+`/auth/*` and the health checks included. The limit is in the API itself, so it holds however
+the hostname is proxied.
 
 ```
-client ── https ──> Cloudflare ──tunnel──> cloudflared ──> caddy:8088 ──> api:3000 /watch/*
-                                                            └── anything else: 404
+client ── https ──> Cloudflare ──tunnel──> … ──> api:3001  /watch/<token>[/code|/verify|/video.mp4|/captions.vtt]
+                                                    └── anything else: 404
 ```
 
-Caddy's watch site (`http://:8088`, no host port) serves `/watch/*` and nothing else, and takes
-the client's address from Cloudflare's `Cf-Connecting-Ip`. The watch page is rendered by the API,
-not by the staff React app, under a strict content security policy.
+The client's address comes from Cloudflare's `Cf-Connecting-Ip`. The watch page is rendered by
+the API, not by the staff React app, under a strict content security policy.
 
 New outbound destinations: the API container may reach `api.twilio.com` when text messages are on,
 and the `cloudflared` container dials Cloudflare. The worker's egress is unchanged.
 
-## Setup
+## Setup on the Vibe Appliance
+
+The appliance does the hostname, DNS and tunnel for you. Recap's manifest declares a `watch`
+surface, the same mechanism as Vibe Connect's `client.<domain>` portal.
+
+1. The appliance must be in **domain mode** with its Cloudflare tunnel set up. LAN and Tailscale
+   modes have no public hostname, and Settings › Sharing will say so.
+2. Enable (or update) Recap. The appliance serves `watch.<domain>` (with the appliance's hostname
+   tag, if one is set), creates its DNS record and tunnel route, and writes the address into
+   Recap's `SHARE_PUBLIC_URL`. To use another label, set **Client watch subdomain** in Recap's
+   Network settings in the console. Saving re-provisions the tunnel; links already sent stop
+   working.
+3. Text messages: enter Twilio once under the console's **Configuration › Email & SMS**. Recap
+   uses it when Settings › Sharing leaves the provider on *From the environment*. Email uses the
+   appliance's Emailit key the same way.
+4. In Recap, Settings › Sharing › turn sharing on, then share a test job to yourself.
+
+On the appliance, Recap's staff host is published through the same tunnel, like every app's;
+it is protected by sign-in (and Vibe Auth when configured), not by being unreachable. Caddy's
+access log on the appliance records request paths, so a share token can appear there; the token
+alone plays nothing without the code sent to the client.
+
+## Setup, standalone
 
 1. **Cloudflare tunnel.** In Cloudflare Zero Trust › Networks › Tunnels, create a tunnel
    (type *cloudflared*) and copy its token. Add a public hostname, for example
@@ -71,14 +95,15 @@ and the `cloudflared` container dials Cloudflare. The worker's egress is unchang
 4. **Text messages (optional).** Settings › Sharing › Twilio: account SID, auth token, and a
    sending number or Messaging Service SID. US numbers need A2P 10DLC registration before
    carriers deliver. Send a test text to your own phone. The token can also come from
-   `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM` in `.env`; it is never exported.
+   `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM` (or the appliance's `SMS_PROVIDER`,
+   `FROM_NUMBER`) in `.env`; it is never exported.
 5. **Turn it on.** Settings › Sharing › *Let preparers share videos with clients*. The badge says
    why it is off until the watch address and at least one channel are ready.
 6. **Check.** Open `https://watch.yourfirm.com/` (404, as it should) and
    `https://watch.yourfirm.com/api/auth/me` (404). Share a test job to yourself.
 
-On the Vibe Appliance the staff host already routes `/watch/*`; a public watch host there is not
-set up yet.
+Standalone, Caddy's watch site (`http://:8088`, no host port) is what the tunnel reaches: it serves
+`/watch/*` and nothing else and forwards to `api:3001`. The staff UI stays on the LAN or Tailscale.
 
 ## Troubleshooting
 

@@ -101,6 +101,9 @@ total tax (verifier now feeds back into the retry loop), and the "tax year exact
 ## Releases
 
 - v0.1.0 (2026-09-05): first release, all nine phases.
+- v0.6.1 (2026-10-02): the watch host through the Vibe Appliance (Q74): a `watch` surface in the
+  manifest, the api's watch-only listener on 3001, Twilio from the appliance's Email & SMS
+  settings; appliance manifest and env template brought level with the appliance's copies.
 - v0.6.0 (2026-10-02): client sharing (Q73): a verified 7-day watch link through a Cloudflare
   tunnel, one-time code by email or Twilio text, optional last-4 check, 5 sessions, stream only,
   cooldown and lock; the first watch ticks Delivered. Migration 0010. Not yet tried against a real
@@ -287,8 +290,15 @@ non-negotiables 3, 4 and 8. Setup and rules: `docs/sharing.md`.
   storage, page states and CSP, code throttle, cooldown, lock, session cap, ranged playback,
   timeline IP kept off the audit log, SMS, revoke, re-issue, origin check, expiry wipe, purge.
 - **Not verified:** no real Cloudflare tunnel, Emailit send to an outside address, or Twilio text
-  has been tried; the watch page has not been opened in a phone browser. The appliance has no
-  public watch host yet.
+  has been tried; the watch page has not been opened in a phone browser.
+- **Appliance (Q74, v0.6.1).** The watch host is now an appliance `watch` surface: Recap's
+  manifest declares it (target `vibe-recap-api:3001`, `VIBE_APP_SUBDOMAIN_WATCH`), the appliance
+  renders its URL into `SHARE_PUBLIC_URL` through the new `@SURFACE_URL_WATCH@` marker
+  (Vibe-Appliance `lib/enable-app.sh::_surface_urls_json`), and Twilio comes from the
+  appliance's Email & SMS settings. `src/watchListener.ts` is the watch-only listener both
+  harnesses proxy to. Recap's `.appliance/vibe-recap.env.tmpl` and manifest had drifted behind
+  the appliance's copies (SSO MFA line, commented Emailit key, `breakglassIdentifier`,
+  `recreate`); both are level again. Not yet enabled on a real appliance.
 
 ## Deviations from the plan
 
