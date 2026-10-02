@@ -26,6 +26,8 @@ class ChatResult:
     eval_count: int | None
     prompt_eval_count: int | None
     total_ms: int | None
+    # "length" means the provider stopped at max_tokens: the script is truncated, not short
+    finish_reason: str | None = None
 
 
 def strip_think(text: str) -> str:

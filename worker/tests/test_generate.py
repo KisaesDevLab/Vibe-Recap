@@ -21,14 +21,15 @@ def extraction(case: str, software: str = "ultratax") -> dict:
 class StubModel:
     """Answers with a queue of canned scripts; records what it was asked."""
 
-    def __init__(self, answers: list[str]):
+    def __init__(self, answers: list[str], finish_reason: str | None = None):
         self.answers = list(answers)
+        self.finish_reason = finish_reason
         self.calls: list[list[dict]] = []
 
     def chat(self, messages, **_):
         self.calls.append([dict(m) for m in messages])
         text = self.answers.pop(0)
-        return ChatResult(content=text, model="stub", eval_count=1, prompt_eval_count=1, total_ms=5)
+        return ChatResult(content=text, model="stub", eval_count=1, prompt_eval_count=1, total_ms=5, finish_reason=self.finish_reason)
 
 
 def test_prompt_lists_only_extracted_facts():
@@ -85,6 +86,14 @@ def test_generate_gives_up_after_three_attempts():
     with pytest.raises(ValueError, match="after 3 attempts"):
         generate(ex, {}, None, model)
     assert len(model.calls) == 3
+
+
+def test_truncated_output_is_reported_as_truncation_not_a_short_script():
+    ex = extraction("hoh-refund-two-states")
+    cut = (GOLDEN / "hoh-refund-two-states.md").read_text(encoding="utf-8")[:400]
+    model = StubModel([cut, cut, cut], finish_reason="length")
+    with pytest.raises(ValueError, match=r"after 3 attempts: output cut off at the token limit"):
+        generate(ex, {}, None, model)
 
 
 def test_strip_think_handles_unterminated_blocks():

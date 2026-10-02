@@ -11,7 +11,7 @@ from types import SimpleNamespace
 import pytest
 
 from recap.script import generate as gen
-from recap.script.router import Router, RouterError
+from recap.script.router import MAX_TOKENS, Router, RouterError
 
 FIXTURES = Path(__file__).resolve().parents[2] / "tests" / "fixtures"
 GOLDEN = FIXTURES / "scripts"
@@ -86,6 +86,13 @@ def test_sends_contract_headers_and_openai_body(stub):
     assert req["body"]["model"] == "llama-3.3-70b" and req["body"]["max_tokens"] == 800 and req["body"]["stream"] is False
     assert out.content.startswith("[[slide:greeting]]") and out.model == "llama-3.3-70b" and out.total_ms == 1234
     assert out.prompt_eval_count == 900
+
+
+def test_default_max_tokens_leaves_room_for_reasoning_models(stub):
+    # Claude Sonnet 5.5 thinks by default and spends that from max_tokens; 1200 truncated it
+    out = Router(stub.url, "tok").chat([{"role": "user", "content": "u"}])
+    assert stub.requests[0]["body"]["max_tokens"] == MAX_TOKENS >= 8000
+    assert out.finish_reason == "stop"
 
 
 def test_error_taxonomy_is_surfaced_by_code(stub):

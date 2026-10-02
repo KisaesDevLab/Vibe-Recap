@@ -20,6 +20,10 @@ import httpx
 from .ollama import ChatResult, OllamaError, strip_think
 
 TASK_CLASS = "recap_script"
+# Output ceiling for router calls. Reasoning models the router may serve (Claude Sonnet 5.5
+# thinks by default) spend their reasoning from this same budget, so 1200 left ~100 words of
+# script and every attempt failed as "too short". The script itself is ~600 tokens.
+MAX_TOKENS = 8000
 RETRYABLE = {"rate_limited", "provider_unavailable"}
 USER_MESSAGES = {
     "scrubber_blocked": "the AI Router blocked the request: protected data would leave the box for this task class",
@@ -93,7 +97,7 @@ class Router:
         except httpx.HTTPError:
             return False
 
-    def chat(self, messages: list[dict[str, str]], *, max_tokens: int = 1200) -> ChatResult:
+    def chat(self, messages: list[dict[str, str]], *, max_tokens: int = MAX_TOKENS) -> ChatResult:
         payload: dict[str, Any] = {
             "messages": messages,
             "max_tokens": max_tokens,
@@ -136,6 +140,7 @@ class Router:
             eval_count=usage.get("completion_tokens"),
             prompt_eval_count=usage.get("prompt_tokens"),
             total_ms=served.get("latency_ms"),
+            finish_reason=choice.get("finish_reason"),
         )
 
 

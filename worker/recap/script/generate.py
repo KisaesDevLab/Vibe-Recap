@@ -199,6 +199,10 @@ def generate(
         script = result.content.strip()
         v = validate_script(script, ex)
         errors = list(v.errors)
+        if result.finish_reason == "length":
+            # name the real cause first: a cut-off script also fails tags and length, which
+            # otherwise reads as a model that ignored the prompt
+            errors.insert(0, f"output cut off at the token limit ({result.model}); the model ran out of tokens before finishing")
         if v.ok and verifier is not None:
             errors = [f"verification: {e}" for e in verifier(script)]
         ok = not errors

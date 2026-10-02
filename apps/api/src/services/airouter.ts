@@ -13,7 +13,9 @@ export const RECAP_TASK_CLASSES = [
     key: "recap_script",
     description: "Plain-English narration script for a client's Form 1040 recap video. Input: extracted figures, first names, filing status, states, preparer note. No SSNs, addresses, or account numbers.",
     requires: {},
-    defaultMaxTokens: 1200,
+    // reasoning models spend thinking from this budget too; 1200 truncated Claude Sonnet 5.5.
+    // The router only ever raises an existing class's default on re-registration.
+    defaultMaxTokens: 8000,
   },
 ];
 
