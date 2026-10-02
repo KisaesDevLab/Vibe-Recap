@@ -64,6 +64,32 @@ def test_script_that_fails_validation_three_times_fails_at_script(env, monkeypat
     assert "script" not in files_of(db, job_id)  # nothing stored, nothing rendered
 
 
+def test_capture_setting_stores_every_attempt_even_when_the_step_fails(env, monkeypatch):
+    cfg, storage, db, *_ = env
+    no_render(monkeypatch)
+    bad = (GOLDEN / "mfj-refund-mo.md").read_text(encoding="utf-8").replace("$3,747", "$3,777")
+    monkeypatch.setattr(gen, "_client_for", lambda ctx: Stub(bad))
+    with db.conn() as c:
+        c.execute("insert into settings (key, value) values ('capture_ai_exchanges', 'true'::jsonb)")
+    job_id = make_job(env, "drake-1040-2025-mfj-refund-mo.pdf")
+    pipeline.run_job(cfg, storage, job_id)
+    assert db.get_job(job_id)["error_step"] == "script"
+    [f] = db.list_files(job_id, "ai_exchange")
+    doc = json.loads(storage.get(f["path"], f["key_path"]))
+    assert doc["run"] == "generate" and f["seq"] == 1 and len(doc["attempts"]) == 3
+    first = doc["attempts"][0]
+    assert first["request"][0]["role"] == "system" and first["response"] == bad and not first["ok"]
+
+
+def test_capture_off_by_default_stores_nothing(env, monkeypatch):
+    cfg, storage, db, *_ = env
+    no_render(monkeypatch)
+    monkeypatch.setattr(gen, "_client_for", lambda ctx: Stub((GOLDEN / "mfj-refund-mo.md").read_text(encoding="utf-8")))
+    job_id = make_job(env, "ultratax-1040-2025-mfj-refund-mo.pdf")
+    pipeline.run_job(cfg, storage, job_id)
+    assert db.list_files(job_id, "ai_exchange") == []
+
+
 def test_manual_edit_resumes_at_validate_and_verify_catches_wrong_fact(env, monkeypatch):
     cfg, storage, db, *_ = env
     no_render(monkeypatch)

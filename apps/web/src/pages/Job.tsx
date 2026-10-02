@@ -12,6 +12,7 @@ import { VerificationPanel } from "../components/VerificationPanel";
 import { VideoPanel } from "../components/VideoPanel";
 import { RevisionPanel } from "../components/RevisionPanel";
 import { FeedbackPanel } from "../components/FeedbackPanel";
+import { AiExchangesPanel } from "../components/AiExchangesPanel";
 import type { ExtractionResponse } from "@vibe-recap/shared";
 import { Alert, Button, Card, Input, PageTitle, Spinner } from "../ui";
 
@@ -90,6 +91,7 @@ export function JobPage() {
           <RevisionPanel job={job} onChanged={() => void reload()} />
           <ScriptEditor job={job} extraction={extractionRes?.extraction ?? null} onChanged={() => void reload()} />
           <VerificationPanel job={job} />
+          {can("preparer") && <AiExchangesPanel job={job} />}
           <ExtractionPanel job={job} onChanged={() => void reload()} />
         </div>
         <div className="space-y-4">

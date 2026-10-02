@@ -19,6 +19,7 @@ import { jobRoutes } from "./routes/jobs.js";
 import { uploadRoutes } from "./routes/uploads.js";
 import { extractionRoutes } from "./routes/extraction.js";
 import { scriptRoutes } from "./routes/script.js";
+import { aiExchangeRoutes } from "./routes/aiExchanges.js";
 import { reviewRoutes } from "./routes/review.js";
 import { releaseRoutes } from "./routes/release.js";
 import { retentionRoutes } from "./routes/retention.js";
@@ -129,6 +130,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   await app.register(uploadRoutes);
   await app.register(extractionRoutes);
   await app.register(scriptRoutes);
+  await app.register(aiExchangeRoutes);
   await app.register(reviewRoutes);
   await app.register(releaseRoutes);
   await app.register(retentionRoutes);

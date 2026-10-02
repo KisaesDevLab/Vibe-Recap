@@ -19,6 +19,10 @@ from ..validate import format_errors_for_model, validate_script
 from .ollama import Ollama, OllamaError
 
 MAX_ATTEMPTS = 3
+# One record per model call, appended when the caller passes a list (setting
+# capture_ai_exchanges). Holds the full conversation as sent and the raw reply, so it is stored
+# only as an encrypted job artifact, never logged.
+Capture = list[dict[str, Any]]
 FILING_STATUS_TEXT = {
     "S": "single",
     "MFJ": "married filing jointly",
@@ -174,6 +178,27 @@ def render_prompt(section: str, ex: dict[str, Any], settings: dict[str, Any], no
 Verifier = Callable[[str], list[str]]
 
 
+def _capture(capture: Capture | None, n: int, messages: list[dict[str, str]], result: Any, ok: bool, words: int, errors: list[str]) -> None:
+    if capture is None:
+        return
+    capture.append(
+        {
+            "attempt": n,
+            "at": datetime.now(timezone.utc).isoformat(),
+            "model": result.model,
+            "finish_reason": result.finish_reason,
+            "prompt_tokens": result.prompt_eval_count,
+            "completion_tokens": result.eval_count,
+            "ms": result.total_ms,
+            "ok": ok,
+            "words": words,
+            "errors": errors[:10],
+            "request": [dict(m) for m in messages],
+            "response": result.content,
+        }
+    )
+
+
 def generate(
     ex: dict[str, Any],
     settings: dict[str, Any],
@@ -181,6 +206,7 @@ def generate(
     client: Ollama,
     log: Any = None,
     verifier: Verifier | None = None,
+    capture: Capture | None = None,
 ) -> tuple[str, list[dict[str, Any]]]:
     """Returns (script, attempts). Raises OllamaError or ValueError after MAX_ATTEMPTS failures.
 
@@ -207,6 +233,7 @@ def generate(
             errors = [f"verification: {e}" for e in verifier(script)]
         ok = not errors
         attempts.append({"attempt": n, "ok": ok, "errors": errors[:10], "words": v.word_count, "ms": result.total_ms})
+        _capture(capture, n, messages, result, ok, v.word_count, errors)
         if log:
             log.info("script attempt", extra={"attempt": n, "ok": ok, "words": v.word_count, "error_count": len(errors)})
         if ok:
@@ -237,6 +264,7 @@ def revise(
     instruction: str,
     log: Any = None,
     verifier: Verifier | None = None,
+    capture: Capture | None = None,
 ) -> tuple[str, list[dict[str, Any]]]:
     """Regenerate with a preparer's instruction, keeping the same hard gates.
 
@@ -269,6 +297,7 @@ def revise(
             errors = [f"verification: {e}" for e in verifier(script)]
         ok = not errors
         attempts.append({"attempt": n, "ok": ok, "errors": errors[:10], "words": v.word_count, "ms": result.total_ms})
+        _capture(capture, n, messages, result, ok, v.word_count, errors)
         if log:
             log.info("revision attempt", extra={"attempt": n, "ok": ok, "words": v.word_count, "error_count": len(errors)})
         if ok:
@@ -316,12 +345,33 @@ def _client_for(ctx: Any) -> Ollama:
     )
 
 
+def _store_capture(ctx: Any, run: str, provider: str, capture: Capture) -> None:
+    """Keep this run's AI exchange as a new encrypted `ai_exchange` artifact (seq = run order).
+
+    Appended, not replaced, so a regeneration keeps the failed run beside it. Best effort: a
+    storage error here must never fail or mask the script step itself."""
+    if not capture:
+        return
+    try:
+        import json
+
+        seq = 1 + max((int(f.get("seq") or 0) for f in ctx.db.list_files(ctx.job_id, "ai_exchange")), default=0)
+        doc = {"run": run, "provider": provider, "at": datetime.now(timezone.utc).isoformat(), "attempts": capture}
+        blob = ctx.storage.put(ctx.job_id, json.dumps(doc).encode("utf-8"))
+        ctx.db.add_file(ctx.job_id, "ai_exchange", blob.path, blob.key_path, blob.sha256, blob.size, seq=seq, file_id=blob.id)
+    except Exception as exc:  # noqa: BLE001
+        if ctx.log:
+            ctx.log.warning("could not store the AI exchange", extra={"error": type(exc).__name__})
+
+
 def generate_script(ctx: Any) -> None:
     from ..pipeline import StepFailed, replace_file
 
     if ctx.extraction is None:
         raise StepFailed("script", "extraction missing")
     client = _client_for(ctx)
+    capture: Capture | None = [] if (ctx.settings or {}).get("capture_ai_exchanges") is True else None
+    provider = type(client).__name__.lower()  # "router" or "ollama"
 
     def verifier(candidate: str) -> list[str]:
         # Same independent check the verify step runs later; here it only shapes the retry.
@@ -345,14 +395,17 @@ def generate_script(ctx: Any) -> None:
             ctx.db.update_revision(str(revision["id"]), status="rejected", error="no current script to revise", resolved_at=datetime.now(timezone.utc))
             raise StepFailed("script", "no current script to revise; regenerate first")
         try:
-            script, attempts = revise(ctx.extraction, ctx.settings, ctx.job.get("note"), client, current, revision["message"], ctx.log, verifier=verifier)
+            script, attempts = revise(ctx.extraction, ctx.settings, ctx.job.get("note"), client, current, revision["message"], ctx.log, verifier=verifier, capture=capture)
         except OllamaError as exc:
+            _store_capture(ctx, "revision", provider, capture or [])
             ctx.db.update_revision(str(revision["id"]), status="rejected", error=str(exc)[:1000], resolved_at=datetime.now(timezone.utc))
             raise StepFailed("script", str(exc)) from exc
         except RevisionRejected as exc:
+            _store_capture(ctx, "revision", provider, capture or [])
             ctx.db.update_revision(str(revision["id"]), status="rejected", error=str(exc)[:1000], attempts=exc.attempts, resolved_at=datetime.now(timezone.utc))
             ctx.db.add_event(ctx.job_id, "processing", "script", "revision rejected; previous script kept", {"revision_id": str(revision["id"]), "attempts": exc.attempts})
             raise RevisionKept(str(revision["previous_status"]), str(exc)) from exc
+        _store_capture(ctx, "revision", provider, capture or [])
         ctx.script = script
         sha = replace_file(ctx, "script", script.encode("utf-8"))
         ctx.db.update_job(ctx.job_id, script_sha256=sha)
@@ -361,14 +414,17 @@ def generate_script(ctx: Any) -> None:
         return
 
     try:
-        script, attempts = generate(ctx.extraction, ctx.settings, ctx.job.get("note"), client, ctx.log, verifier=verifier)
+        script, attempts = generate(ctx.extraction, ctx.settings, ctx.job.get("note"), client, ctx.log, verifier=verifier, capture=capture)
     except OllamaError as exc:
+        _store_capture(ctx, "generate", provider, capture or [])
         raise StepFailed("script", str(exc)) from exc
     except ValueError as exc:
+        _store_capture(ctx, "generate", provider, capture or [])
         attempts = getattr(exc, "attempts", None)
         if attempts:
             ctx.db.add_event(ctx.job_id, "processing", "script", "all attempts rejected by the validator", {"attempts": attempts})
         raise StepFailed("script", str(exc)) from exc
+    _store_capture(ctx, "generate", provider, capture or [])
     ctx.script = script
     sha = replace_file(ctx, "script", script.encode("utf-8"))
     ctx.db.update_job(ctx.job_id, script_sha256=sha)

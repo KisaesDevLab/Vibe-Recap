@@ -96,6 +96,28 @@ def test_truncated_output_is_reported_as_truncation_not_a_short_script():
         generate(ex, {}, None, model)
 
 
+def test_capture_records_each_call_as_sent_and_the_raw_reply():
+    ex = extraction("hoh-refund-two-states")
+    good = (GOLDEN / "hoh-refund-two-states.md").read_text(encoding="utf-8")
+    bad = good.replace("$4,900", "$4,950")
+    model = StubModel([bad, good])
+    capture: list[dict] = []
+    generate(ex, {}, None, model, capture=capture)
+    assert [c["attempt"] for c in capture] == [1, 2] and [c["ok"] for c in capture] == [False, True]
+    # each record holds the conversation exactly as that call received it, and the raw reply
+    assert capture[0]["request"] == model.calls[0] and capture[1]["request"] == model.calls[1]
+    assert [m["role"] for m in capture[0]["request"]] == ["system", "user"]
+    assert capture[0]["response"] == bad and capture[1]["response"] == good
+    assert any("$4,950" in e for e in capture[0]["errors"]) and capture[0]["model"] == "stub"
+
+
+def test_no_capture_list_means_nothing_is_recorded():
+    ex = extraction("single-owed-itemized")
+    model = StubModel([(GOLDEN / "single-owed-itemized.md").read_text(encoding="utf-8")])
+    script, attempts = generate(ex, {}, None, model)  # default capture=None must not fail or record
+    assert attempts[0]["ok"] and "request" not in attempts[0]
+
+
 def test_strip_think_handles_unterminated_blocks():
     assert strip_think("<think>a</think>hello") == "hello"
     assert strip_think("hello<think>ran out") == "hello"

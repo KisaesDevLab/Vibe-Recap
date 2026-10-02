@@ -165,6 +165,7 @@ export const fileKindEnum = pgEnum("file_kind", [
   "video",
   "vtt",
   "txt",
+  "ai_exchange",
 ]);
 
 export const clients = pgTable(

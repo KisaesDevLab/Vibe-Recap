@@ -16,6 +16,7 @@ interface GeneralResponse {
     model_name: string;
     ollama_url: string;
     temperature: number;
+    capture_ai_exchanges: boolean;
     ollama_timeout_s: number;
     target_words: number;
     concurrency: number;
@@ -60,6 +61,7 @@ export function SettingsGeneralPage() {
       model_name: fd.get("model_name"),
       ollama_url: fd.get("ollama_url"),
       temperature: Number(fd.get("temperature")),
+      capture_ai_exchanges: fd.get("capture_ai_exchanges") === "on",
       ollama_timeout_s: Number(fd.get("ollama_timeout_s")),
       target_words: Number(fd.get("target_words")),
       concurrency: Number(fd.get("concurrency")),
@@ -185,6 +187,15 @@ export function SettingsGeneralPage() {
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" name="ocr_enabled" defaultChecked={s.ocr_enabled} /> OCR fallback for scanned pages ({data.defaults.ocr_model})
             </label>
+            <div>
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" name="capture_ai_exchanges" defaultChecked={s.capture_ai_exchanges} /> Record what is sent to the AI
+              </label>
+              <p className="mt-1 text-xs text-slate-500">
+                Keeps each script generation's full prompt and the model's reply with the job, encrypted, for the job page's AI exchanges view (preparers
+                and admins; every view is audited). Purged with the job's extraction and script. Turn on while diagnosing script failures.
+              </p>
+            </div>
             <p className="text-xs text-slate-500">{data.note}</p>
             <div className="flex items-center gap-2">
               <Button type="button" variant="secondary" disabled={busy} onClick={() => testOllama(document.getElementById("general") as HTMLFormElement)}>

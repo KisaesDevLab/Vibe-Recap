@@ -48,6 +48,7 @@ export const FILE_KINDS = [
   "video",
   "vtt",
   "txt",
+  "ai_exchange", // full script-step conversation; written only while capture_ai_exchanges is on
 ] as const;
 export type FileKind = (typeof FILE_KINDS)[number];
 

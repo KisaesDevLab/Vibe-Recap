@@ -15,6 +15,9 @@ export const SETTING_DEFAULTS = {
   ollama_url: "" as string, // empty = use OLLAMA_URL env
   model_name: "" as string, // empty = use OLLAMA_MODEL env
   temperature: 0.3,
+  // Keep each script run's full AI conversation (prompt as sent, raw reply) as an encrypted job
+  // artifact for the job page's "AI exchanges" viewer. Off by default: it is a debugging aid.
+  capture_ai_exchanges: false,
   ollama_timeout_s: 600,
   target_words: 350,
   concurrency: 1,

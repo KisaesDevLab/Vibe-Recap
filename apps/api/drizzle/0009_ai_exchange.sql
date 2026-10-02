@@ -1,0 +1,1 @@
+ALTER TYPE "public"."file_kind" ADD VALUE 'ai_exchange';

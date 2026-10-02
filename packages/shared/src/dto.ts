@@ -396,3 +396,45 @@ export interface FeedbackListDto {
   rows: FeedbackAdminRowDto[];
   total: number;
 }
+
+// ---------------------------------------------------------------------------
+// AI exchanges (setting capture_ai_exchanges): what the script step sent and got back
+// ---------------------------------------------------------------------------
+
+export interface AiMessageDto {
+  role: string;
+  content: string;
+}
+
+/** One model call. `request` / `response` are only present on the single-run read. */
+export interface AiAttemptDto {
+  attempt: number;
+  at: string | null;
+  model: string | null;
+  finishReason: string | null;
+  promptTokens: number | null;
+  completionTokens: number | null;
+  ms: number | null;
+  ok: boolean;
+  words: number;
+  errors: string[];
+  request?: AiMessageDto[];
+  response?: string;
+}
+
+/** One script-step run (a generation or a revision), stored as one `ai_exchange` file. */
+export interface AiExchangeRunDto {
+  fileId: string;
+  seq: number;
+  run: "generate" | "revision";
+  provider: string;
+  at: string;
+  attempts: AiAttemptDto[];
+  purged: boolean;
+}
+
+export interface AiExchangesResponse {
+  /** Whether capture is on now; runs from before it was turned on were never recorded. */
+  enabled: boolean;
+  runs: AiExchangeRunDto[];
+}

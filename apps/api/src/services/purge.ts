@@ -3,7 +3,7 @@
  *
  * Windows (firm settings, per-client overrides, legal hold suspends everything):
  *   source PDFs         N days after upload            (source, prior)
- *   extraction + script N days after release           (extraction, script, verification)
+ *   extraction + script N days after release           (extraction, script, verification, ai_exchange)
  *   videos              N days after release           (video, vtt, txt, audio, slide)
  *   failed jobs         N days after failure           (everything on the job)
  * A file is due when the job reached the anchoring state at least N days ago. Jobs that were
@@ -23,7 +23,7 @@ import { getAllSettings } from "./settings.js";
 import { heldJobIds } from "../routes/feedback.js";
 
 const SOURCE_KINDS: FileKind[] = ["source", "prior"];
-const EXTRACTION_KINDS: FileKind[] = ["extraction", "script", "verification"];
+const EXTRACTION_KINDS: FileKind[] = ["extraction", "script", "verification", "ai_exchange"];
 const VIDEO_KINDS: FileKind[] = ["video", "vtt", "txt", "audio", "slide"];
 
 export interface PurgeCandidate {
