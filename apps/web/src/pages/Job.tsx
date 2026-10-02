@@ -10,6 +10,7 @@ import { ExtractionPanel } from "../components/ExtractionPanel";
 import { ScriptEditor } from "../components/ScriptEditor";
 import { VerificationPanel } from "../components/VerificationPanel";
 import { VideoPanel } from "../components/VideoPanel";
+import { SharePanel } from "../components/SharePanel";
 import { RevisionPanel } from "../components/RevisionPanel";
 import { FeedbackPanel } from "../components/FeedbackPanel";
 import { AiExchangesPanel } from "../components/AiExchangesPanel";
@@ -87,6 +88,7 @@ export function JobPage() {
             </ol>
           </Card>
           <VideoPanel job={job} onChanged={() => void reload()} />
+          <SharePanel job={job} onChanged={() => void reload()} />
           <FeedbackPanel job={job} onChanged={() => void reload()} />
           <RevisionPanel job={job} onChanged={() => void reload()} />
           <ScriptEditor job={job} extraction={extractionRes?.extraction ?? null} onChanged={() => void reload()} />

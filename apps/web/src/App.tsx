@@ -22,6 +22,7 @@ import { ForgotPasswordPage } from "./pages/ForgotPassword";
 import { ResetPasswordPage } from "./pages/ResetPassword";
 import { AccountPage } from "./pages/Account";
 import { SettingsEmailPage } from "./pages/SettingsEmail";
+import { SettingsSharingPage } from "./pages/SettingsSharing";
 import { SettingsAuthPage } from "./pages/SettingsAuth";
 import { Alert, Spinner } from "./ui";
 
@@ -106,6 +107,7 @@ export function App() {
           <Route path="retention" element={<SettingsRetentionPage />} />
           <Route path="users" element={<SettingsUsersPage />} />
           <Route path="email" element={<SettingsEmailPage />} />
+          <Route path="sharing" element={<SettingsSharingPage />} />
           <Route path="authentication" element={<SettingsAuthPage />} />
           <Route path="audit" element={<SettingsAuditPage />} />
           <Route path="quality" element={<SettingsQualityPage />} />
