@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Operational notes for Claude Code working in this repo. Read this first, then `docs/PLAN.md`, then `docs/PHASES.md`, then `STATE.md`.
 
-> **Current state (2026-10-01):** Schedule 1 by kind of income (Q69) and two verifier false-positive fixes (Q70) are on `main`, untagged, on top of extraction overrides (Q66) and the UltraTax line-mapping fixes from a third real return (Q67). Earlier: all nine phases built and verified; v0.4.1 tagged (v0.1.0 was the first release);
+> **Current state (2026-10-01):** v0.5.0 tagged: the AI exchanges viewer (Q72) and the router output budget for reasoning models (Q71), Schedule 1 by kind of income (Q69), two verifier false-positive fixes (Q70), extraction overrides (Q66) and the UltraTax line-mapping fixes from a third real return (Q67). Earlier: all nine phases built and verified (v0.1.0 was the first release);
 > it adds optional single sign-on through Vibe Auth (Q57 to Q62), verified in a real browser against a real authentik on the dev box, not yet registered on an appliance. Source is
 > public at `github.com/KisaesDevLab/Vibe-Recap`; images publish to GHCR from `.github/workflows/publish.yml`
 > on every push to `main` (`latest`, `sha-*`) and on `v*.*.*` tags. Read `STATE.md` for what changed after
