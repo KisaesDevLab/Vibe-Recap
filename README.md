@@ -31,12 +31,14 @@ upload → identify → extract → recon gate → script (local LLM) → valida
   return, extraction, script, and video for 90 days so the cause can be fixed; Settings › Quality
   shows the rate, the reasons, and a diagnostic bundle per case.
 - **Preparer approval before release.** Approve snapshots the script, the extraction, and the
-  verification. Delivery is download only: MP4, captions, transcript, or one ZIP.
+  verification. Deliver by download (MP4, captions, transcript, or one ZIP) or, optionally, a
+  7-day watch link that plays only after a one-time code sent to the client
+  ([`docs/sharing.md`](docs/sharing.md)).
 - **Retention is a job, not a promise.** An hourly purge is the only thing that deletes files, and
   every deletion is in the audit log.
 - **Accounts stay local.** Local passwords (Argon2id), each user changes their own from the
   account page, and an optional Emailit hookup sends invites and password-reset links to firm
-  users. Clients are never emailed.
+  users. Clients get a message only when a preparer shares a video: the link and the code.
 
 ![Job review](docs/screenshots/job.png)
 
@@ -83,13 +85,13 @@ baked into the worker image for production.
 | `packages/shared` | Types and the script validator mirror shared by web and api |
 | `form-profiles` | YAML line maps per software, reconciled onto the data volume at each worker start (local edits kept) |
 | `tests/fixtures` | Synthetic returns with expected extractions and golden scripts. Never real returns. |
-| `docs` | [PLAN](docs/PLAN.md), [PHASES](docs/PHASES.md), [INSTALL](docs/INSTALL.md) |
+| `docs` | [PLAN](docs/PLAN.md), [PHASES](docs/PHASES.md), [INSTALL](docs/INSTALL.md), [sharing](docs/sharing.md) |
 | `STATE.md`, `QUESTIONS.md` | Build status and the decisions taken along the way |
 
 ## License
 
 PolyForm Small Business License 1.0.0. See [`LICENSE`](LICENSE). There is no license key and no
 phone-home: the API's only outbound connections are the Vibe AI Router and, when an admin turns
-on outgoing email, Emailit.
+them on, Emailit, Twilio (text messages for client sharing) and the firm's identity provider.
 
 Built by [Kisaes LLC](https://kisaes.com).

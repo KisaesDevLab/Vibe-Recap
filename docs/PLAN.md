@@ -4,7 +4,7 @@
 
 Give tax clients a two-to-three minute narrated video that explains their return in plain English: what they earned, what they paid, why the refund or balance due is what it is. It accompanies the delivered return: the recap closes by telling the client their complete copy is on its way and to contact the firm with any questions (amended 2026-09-11, QUESTIONS.md Q50). Preparers upload the finished return package, review the generated script, approve, and send. The firm keeps every byte on its own hardware.
 
-Positioning inside the Vibe suite: a **standalone appliance** with its own UI, users, storage, and retention rules. It does not require any other Vibe product. Delivery is download only: the preparer downloads the approved video and sends it through whatever channel the firm already uses. No portal, no share links, no integrations in v1.
+Positioning inside the Vibe suite: a **standalone appliance** with its own UI, users, storage, and retention rules. It does not require any other Vibe product. Delivery is download only: the preparer downloads the approved video and sends it through whatever channel the firm already uses. No portal, no share links, no integrations in v1. (Since 2026-10-02 a preparer may also send a verified, time-limited watch link; QUESTIONS.md Q73, `docs/sharing.md`.)
 
 ## 2. Locked decisions
 
@@ -20,7 +20,7 @@ Positioning inside the Vibe suite: a **standalone appliance** with its own UI, u
 | L8 | Files encrypted at rest with per-file `age` keys; master key on local disk, optionally passphrase-wrapped. | Matches FTC Safeguards expectations; cheap to implement. |
 | L9 | Retention: per-firm default policy plus per-client override; enforced by hourly purge job with audit log. | Explicit user requirement. |
 | L10 | Roles: `admin`, `preparer`, `staff`, `viewer`. | Enough for a small firm; see §6. |
-| L11 | Delivery is download only. No share links, no client portal, no Vibe Connect or other integrations. | Kurt's decision 2026-09-03. Smallest attack surface; the firm already has a delivery channel. |
+| L11 | Delivery is download only. No share links, no client portal, no Vibe Connect or other integrations. Amended 2026-10-02 (QUESTIONS.md Q73): a verified, time-limited watch link is also allowed; see the amendment below. | Kurt's decision 2026-09-03. Smallest attack surface; the firm already has a delivery channel. |
 | L12 | Worker container has no egress except to `ollama` on the internal network. API container's only outbound destination is `licensing.kisaes.com`. | §7216 posture must be enforceable, not just documented. |
 | L14 | Ollama is bundled in compose; `OLLAMA_URL` overrides to an external instance (on the M6: the host's existing Ollama, bundled service scaled to 0). | Q1. |
 | L15 | Extracted values are never hand-edited. Wrong extraction = wrong form profile; fix the profile and re-extract. Amended 2026-09-24 (QUESTIONS.md Q66): a `preparer` may override a misread figure with a reason; every override is logged with the line the profile misread, the job re-runs from `extract`, and recon, `validate` and `verify` still gate it. The profile fix remains the remedy; the override log is its work list. | Q2, Q66. |
@@ -55,6 +55,14 @@ modes `local` (default), `both`, `oidc_only` with a break-glass local admin. The
 outbound destinations become the router, Emailit and, once configured, the firm's identity
 provider. Nothing from a return goes there; the worker's egress is unchanged; Recap still installs
 and runs on its own with single sign-on off. See `docs/sso.md` and QUESTIONS.md Q57 to Q60.
+
+**Amendment 2026-10-02 (Kurt, Q73):** L11 and L12 are amended. Besides download, a preparer may
+share an approved video with the client through a verified, time-limited link on a separate
+public watch host reached through an outbound-only Cloudflare tunnel: 7 days, a one-time code to
+the email address or mobile number the preparer entered, an optional last-4-of-SSN check, 5
+viewing sessions, stream only. Recap may now email or text a client, but only that link and that
+code. The API container may also reach `api.twilio.com` when text messages are on; the worker's
+egress is unchanged. See `docs/sharing.md`.
 
 ## 3. Architecture
 
@@ -204,4 +212,4 @@ Data at rest encrypted (age, per-file keys). Data in transit TLS via Caddy. No t
 
 ## 10. Out of scope for v1
 
-Business returns; client portal or share links; Vibe Connect / T&B or any other integration; e-signature; multi-firm tenancy; email to clients (the app never emails clients; preparers download and send the file themselves; since 2026-09-05 it does email firm users invites and password-reset links through Emailit, QUESTIONS.md Q48); avatar or generative video; mobile app.
+Business returns; client portal (verified share links were added 2026-10-02, QUESTIONS.md Q73); Vibe Connect / T&B or any other integration; e-signature; multi-firm tenancy; email to clients (the app never emails clients; preparers download and send the file themselves; since 2026-09-05 it does email firm users invites and password-reset links through Emailit, QUESTIONS.md Q48); avatar or generative video; mobile app.

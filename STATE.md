@@ -261,6 +261,31 @@ figure (Q69), and reported a job rejected at `script` on two verification flags 
   assumed to be Form 1040's inner column (no real return fills one).
 - **Open for Kurt**: splitting Schedule E (Q69); keeping rejected script attempts (Q70).
 
+## Client sharing (2026-10-02)
+
+Kurt asked for a secure, easy way to get the video to the client (Q73). It amends L11, L12 and
+non-negotiables 3, 4 and 8. Setup and rules: `docs/sharing.md`.
+
+- **API.** `job_shares` and `share_events` (migration 0010). `services/shares.ts` holds the rules
+  (token, code, last 4, sessions, cooldown and lock, expiry sweep, purge hook); `routes/shares.ts`
+  is the staff side (create, revoke, re-issue, timeline, Settings › Sharing, test text);
+  `routes/watch.ts` is the client side (server-rendered page, code, verify, ranged video,
+  captions). `services/sms.ts` is the Twilio client; email reuses Emailit with two new templates.
+  The `/watch/` routes check their own origin (the auth plugin's allow-list skips them) and their
+  token is masked in request logs (`logger.ts::maskUrl`). The 10-minute cron also wipes expired
+  shares; a job purge wipes its shares and nulls IP and browser on its timeline.
+- **Web.** Share with client card on the job page (form, shares with revoke/re-issue, client
+  activity); Settings › Sharing (on/off, watch address, Twilio).
+- **Infra.** Caddy site `http://:8088` (watch only, `Cf-Connecting-Ip` as the client address),
+  `cloudflared` service under compose profile `share`, `/watch/*` on the staff host too (Caddy,
+  Vite, appliance manifest). New env: `SHARE_PUBLIC_URL`, `CLOUDFLARE_TUNNEL_TOKEN`, `TWILIO_*`.
+- **Tests.** `test/shares.integration.test.ts` (9 tests): gating, messages without names, hashed
+  storage, page states and CSP, code throttle, cooldown, lock, session cap, ranged playback,
+  timeline IP kept off the audit log, SMS, revoke, re-issue, origin check, expiry wipe, purge.
+- **Not verified:** no real Cloudflare tunnel, Emailit send to an outside address, or Twilio text
+  has been tried; the watch page has not been opened in a phone browser. The appliance has no
+  public watch host yet.
+
 ## Deviations from the plan
 
 - Phase 2: the "kill the worker mid-job, the rest continue" test is deferred to Phase 3 where the
