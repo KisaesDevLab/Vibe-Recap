@@ -25,6 +25,8 @@ sending the file through another channel. Off by default. Decided by Kurt on 202
 | Sessions | A passed check opens a 2-hour viewing session (seeking and replays are free). At most 5 per link. |
 | Wrong answers | Wrong code and wrong last 4 count together: a 15-minute cooldown after every 3, a permanent lock at 10. The preparer re-issues. |
 | Playback | Inline, range requests, `no-store`, no download control. This deters saving; it cannot prevent a screen recording. |
+| Several links | A job may have more than one active link, for example one to each spouse, each with its own contact, last 4 and counters. |
+| Delivered | The client's first watch ticks the job's Delivered box ("watched via share link <date>"), unless a preparer already ticked it. |
 | Release | Sharing an approved job releases it, as a download does. Shares do not change retention: when the purge takes the video, the link says it is gone. |
 | Timeline | The job page lists every event (sent, code sent, verified, wrong answer, cooldown, locked, watched, revoked, expired) with the client's IP and browser. IP and browser are kept until the job is purged; the audit log records the events without them. |
 | Who | Preparer and admin share, revoke and re-issue; staff see the timeline. |

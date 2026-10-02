@@ -170,6 +170,9 @@ describe.skipIf(!available)("client sharing (Q73)", () => {
     const after = await shareOf(jobId);
     expect(after.sessionsUsed).toBe(1);
     expect(after.firstViewedAt).not.toBeNull();
+    const [delivered] = await ctx.db.select().from(jobs).where(eq(jobs.id, jobId));
+    expect(delivered!.delivered).toBe(true);
+    expect(delivered!.deliveredNote).toMatch(/^watched via share link \d{4}-\d{2}-\d{2}$/);
 
     // Timeline for staff carries the client's IP and browser; the never-purged audit log does not.
     const timeline = await staff.get(`/api/jobs/${jobId}/shares`);

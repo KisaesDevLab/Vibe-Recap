@@ -15,7 +15,7 @@
 import { createHash, randomBytes, randomInt, timingSafeEqual } from "node:crypto";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { and, desc, eq, inArray, isNull, lt } from "drizzle-orm";
-import { jobShares, shareEvents, type JobShare } from "../db/schema.js";
+import { jobShares, jobs, shareEvents, type JobShare } from "../db/schema.js";
 import { hashPassword, verifyPassword } from "../auth/password.js";
 import { emailConfig, isEmailAddress, sendEmail } from "./email.js";
 import { shareCodeEmail, shareLinkEmail } from "./email-templates.js";
@@ -315,8 +315,22 @@ export async function sessionValid(app: FastifyInstance, share: JobShare, sessio
 /** First play of a session: one timeline entry per session, not one per range request. */
 export async function notePlayed(app: FastifyInstance, share: JobShare, sessionToken: string, req: FastifyRequest): Promise<void> {
   if (!(await app.redis.set(`share:played:${sha256(sessionToken)}`, "1", "EX", SESSION_TTL_S, "NX"))) return;
-  if (!share.firstViewedAt) await app.db.update(jobShares).set({ firstViewedAt: new Date() }).where(and(eq(jobShares.id, share.id), isNull(jobShares.firstViewedAt)));
+  const now = new Date();
+  const first = await app.db
+    .update(jobShares)
+    .set({ firstViewedAt: now })
+    .where(and(eq(jobShares.id, share.id), isNull(jobShares.firstViewedAt)))
+    .returning({ id: jobShares.id });
   await recordShareEvent(app, share, "played", { req });
+  // The client watching is delivery (Q73): tick the job's Delivered box, unless a preparer already did.
+  if (first.length) {
+    const marked = await app.db
+      .update(jobs)
+      .set({ delivered: true, deliveredNote: `watched via share link ${now.toISOString().slice(0, 10)}`, updatedAt: now })
+      .where(and(eq(jobs.id, share.jobId), eq(jobs.delivered, false)))
+      .returning({ id: jobs.id });
+    if (marked.length) await audit(app.db, { actor: CLIENT_ACTOR, action: "job.delivered", target: { type: "job", id: share.jobId }, meta: { via: "share", share_id: share.id } });
+  }
 }
 
 /** Forget the contact and the last-4 hash. Idempotent. */
