@@ -101,6 +101,8 @@ total tax (verifier now feeds back into the retry loop), and the "tax year exact
 ## Releases
 
 - v0.1.0 (2026-09-05): first release, all nine phases.
+- v0.6.2 (2026-10-06): a return / e-sign link on a share, shown as a button on the watch page
+  after the client verifies (Q75); migration 0011.
 - v0.6.1 (2026-10-02): the watch host through the Vibe Appliance (Q74): a `watch` surface in the
   manifest, the api's watch-only listener on 3001, Twilio from the appliance's Email & SMS
   settings; appliance manifest and env template brought level with the appliance's copies.
