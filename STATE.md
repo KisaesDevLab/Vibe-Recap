@@ -299,6 +299,13 @@ non-negotiables 3, 4 and 8. Setup and rules: `docs/sharing.md`.
   harnesses proxy to. Recap's `.appliance/vibe-recap.env.tmpl` and manifest had drifted behind
   the appliance's copies (SSO MFA line, commented Emailit key, `breakglassIdentifier`,
   `recreate`); both are level again. Not yet enabled on a real appliance.
+- **Return / e-sign link (Q75, 2026-10-06).** A share may carry the URL where the client reviews
+  and signs the return in the firm's other app; once verified, the watch page shows a button to it
+  (label from `share_return_label`). Pasted on the share form or added/replaced/removed later
+  (`PUT /api/jobs/:id/shares/:shareId/return-link`); re-issue keeps it. Stored wrapped
+  (`return_url_wrapped`, plus `return_url_host` for the job page; migration 0011), wiped with the
+  contact, audited by hostname only. Test added to `shares.integration.test.ts`. Not yet tried
+  with a real link from the e-sign app.
 
 ## Deviations from the plan
 

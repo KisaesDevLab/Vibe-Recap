@@ -13,6 +13,9 @@ sending the file through another channel. Off by default. Decided by Kurt on 202
    preparer entered, never to one the client types, so a forwarded link is useless on its own.
 3. The client enters the 6-digit code and, if the preparer asked for it, the last four digits of
    their SSN. The page then plays the video, captions on, with no download button.
+4. If the preparer added a tax return / e-sign link to the share, a button under the video
+   (by default **Review and sign your return**; the label is set in Settings › Sharing) opens it
+   in a new tab. It is not on the code page, only after the client has verified.
 
 ## Rules
 
@@ -29,6 +32,7 @@ sending the file through another channel. Off by default. Decided by Kurt on 202
 | Delivered | The client's first watch ticks the job's Delivered box ("watched via share link <date>"), unless a preparer already ticked it. |
 | Release | Sharing an approved job releases it, as a download does. Shares do not change retention: when the purge takes the video, the link says it is gone. |
 | Timeline | The job page lists every event (sent, code sent, verified, wrong answer, cooldown, locked, watched, revoked, expired) with the client's IP and browser. IP and browser are kept until the job is purged; the audit log records the events without them. |
+| Return link | Optional per share (Q75): the client's link in the firm's return and e-sign app, `https` only. Pasted on the share form, or added, replaced or removed later from the share's row; re-issue keeps it. Wrapped with the master key, erased with the contact; the job page shows only its hostname, and the audit log records the hostname only. Recap never calls it; `no-referrer` keeps the watch link out of the other app's logs. |
 | Who | Preparer and admin share, revoke and re-issue; staff see the timeline. |
 
 **Re-issue** sends a fresh 7-day link to the same contact with the same last-4 check and revokes

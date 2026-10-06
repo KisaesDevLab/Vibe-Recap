@@ -232,7 +232,8 @@ Never commit a real tax return. `tests/fixtures/` contains synthetic 1040 packag
   hook does not cover it and the auth plugin's origin allow-list skips it; `watch.ts` checks the
   origin itself. The share token is a bearer secret in the path: `logger.ts::maskUrl` keeps it out
   of request logs. Client IP and browser go on `share_events` (nulled at job purge), never on
-  `audit_events`, which is never purged.
+  `audit_events`, which is never purged. The optional return / e-sign link (Q75) is wrapped like
+  the contact, rendered only in the verified (watch) state, and audited by hostname only.
 - **Password-reset and invite tokens live in Redis**, hashed (`pwreset:<sha256>`, 1 h) and plain (`invite:<token>`, 24 h) respectively; a new reset request revokes the previous one; `consumeResetToken` uses GETDEL so a link works once. Links are built from the `public_url` setting, then `PUBLIC_URL`, then the first `ALLOWED_ORIGIN`, then the request origin.
 
 ## Definition of done for any phase
