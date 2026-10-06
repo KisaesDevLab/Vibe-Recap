@@ -465,6 +465,8 @@ export interface ShareDto {
   /** The contact and last-4 hash were wiped (share expired or job purged); re-issue needs them typed again. */
   wiped: boolean;
   firstViewedAt: string | null;
+  /** Hostname of the return / e-sign link shown to the client after they verify (Q75); the URL itself stays on the server. */
+  returnLinkHost: string | null;
 }
 
 export interface ShareEventDto {

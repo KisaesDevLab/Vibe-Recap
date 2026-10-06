@@ -13,7 +13,20 @@ import { audit } from "../services/audit.js";
 import { EmailError, EmailNotConfigured } from "../services/email.js";
 import { getAllSettings, setSetting, type SettingKey } from "../services/settings.js";
 import { SmsError, sendSms, smsConfig } from "../services/sms.js";
-import { createShare, listShares, normalizeContact, normalizePhone, recordShareEvent, shareBlocked, sharingStatus, type Channel } from "../services/shares.js";
+import {
+  createShare,
+  listShares,
+  normalizeContact,
+  normalizePhone,
+  normalizeReturnUrl,
+  RETURN_URL_MAX,
+  recordShareEvent,
+  ReturnUrlError,
+  setReturnUrl,
+  shareBlocked,
+  sharingStatus,
+  type Channel,
+} from "../services/shares.js";
 import { loadJob } from "./jobs.js";
 
 function toDto(s: JobShare, now = new Date()): ShareDto {
@@ -37,6 +50,7 @@ function toDto(s: JobShare, now = new Date()): ShareDto {
     revokedByLabel: s.revokedByLabel,
     wiped: !!s.wipedAt,
     firstViewedAt: s.firstViewedAt?.toISOString() ?? null,
+    returnLinkHost: s.returnUrlHost,
   };
 }
 
@@ -54,7 +68,18 @@ const createBody = z.object({
   contact: z.string().min(3).max(200),
   requireSecret: z.boolean(),
   last4: z.string().max(8).nullable().optional(),
+  /** Return / e-sign link in the firm's other app (Q75), shown to the client after they verify. */
+  returnUrl: z.string().max(RETURN_URL_MAX + 100).nullable().optional(),
 });
+
+function returnUrlOf(raw: string | null | undefined): string | null {
+  try {
+    return normalizeReturnUrl(raw);
+  } catch (err) {
+    if (err instanceof ReturnUrlError) throw badRequest(err.message);
+    throw err;
+  }
+}
 
 export async function shareRoutes(app: FastifyInstance) {
   app.get("/api/jobs/:id/shares", { preHandler: requireRole("staff") }, async (req): Promise<SharesResponse> => {
@@ -83,9 +108,10 @@ export async function shareRoutes(app: FastifyInstance) {
     if (!contact) throw badRequest(body.channel === "sms" ? "Enter a mobile number, e.g. (555) 123-4567 or +44 20 7946 0958" : "Enter a valid email address");
     const last4 = body.last4?.trim() || null;
     if (body.requireSecret && !/^\d{4}$/.test(last4 ?? "")) throw badRequest("Enter the last four digits of the client's SSN, or turn that check off");
+    const returnUrl = returnUrlOf(body.returnUrl);
 
     const actor = actorOf(req);
-    const { share } = await createShare(app, { jobId: id, channel: body.channel, contact, requireSecret: body.requireSecret, last4, actor }, req).catch(sendError);
+    const { share } = await createShare(app, { jobId: id, channel: body.channel, contact, requireSecret: body.requireSecret, last4, returnUrl, actor }, req).catch(sendError);
     // Sharing is delivery, the same as a download: an approved job becomes released.
     if (row.job.status === "approved") {
       const now = new Date();
@@ -125,7 +151,7 @@ export async function shareRoutes(app: FastifyInstance) {
     if (!status.channels[channel]) throw badRequest(`${channel === "sms" ? "Text messages are" : "Email is"} not set up`);
     const contact = await app.storage.unwrapSecret(old.contactWrapped);
     const actor = actorOf(req);
-    const { share } = await createShare(app, { jobId: id, channel, contact, requireSecret: old.secretRequired, last4: null, secretHash: old.secretHash, actor }, req).catch(sendError);
+    const { share } = await createShare(app, { jobId: id, channel, contact, requireSecret: old.secretRequired, last4: null, secretHash: old.secretHash, returnUrlCarried: { wrapped: old.returnUrlWrapped, host: old.returnUrlHost }, actor }, req).catch(sendError);
     if (!old.revokedAt) {
       await app.db.update(jobShares).set({ revokedAt: new Date(), revokedByLabel: actor.label }).where(eq(jobShares.id, old.id));
       await recordShareEvent(app, old, "revoked", { req, actor, meta: { reissued_as: share.id } });
@@ -134,9 +160,23 @@ export async function shareRoutes(app: FastifyInstance) {
     return { share: toDto(share) };
   });
 
+  /** Set, replace or remove the return / e-sign link on a share that is still usable (Q75). */
+  app.put("/api/jobs/:id/shares/:shareId/return-link", { preHandler: requireRole("preparer"), config: { rateLimit: { max: 20, timeWindow: "1 minute" } } }, async (req) => {
+    const { id, shareId } = req.params as { id: string; shareId: string };
+    const body = z.object({ url: z.string().max(RETURN_URL_MAX + 100).nullable() }).parse(req.body ?? {});
+    const [share] = await app.db.select().from(jobShares).where(and(eq(jobShares.id, shareId), eq(jobShares.jobId, id))).limit(1);
+    if (!share) throw notFound("Share not found");
+    const blocked = shareBlocked(share);
+    if (blocked && blocked !== "locked") throw conflict(`This share is ${blocked === "wiped" ? "expired" : blocked}; send a new one instead`);
+    const url = returnUrlOf(body.url);
+    if (!url && !share.returnUrlWrapped) return { share: toDto(share) };
+    const updated = await setReturnUrl(app, share, url, { req, actor: actorOf(req) });
+    return { share: toDto(updated) };
+  });
+
   // ---- Settings > Sharing ------------------------------------------------------------------
 
-  const keys = ["share_enabled", "share_public_url", "sms_provider", "twilio_account_sid", "twilio_from"] as const satisfies readonly SettingKey[];
+  const keys = ["share_enabled", "share_public_url", "share_return_label", "sms_provider", "twilio_account_sid", "twilio_from"] as const satisfies readonly SettingKey[];
 
   async function view() {
     const s = await getAllSettings(app.db);
@@ -161,6 +201,7 @@ export async function shareRoutes(app: FastifyInstance) {
       .object({
         share_enabled: z.boolean().optional(),
         share_public_url: z.string().max(200).optional(),
+        share_return_label: z.string().max(60).optional(),
         sms_provider: z.enum(["", "none", "twilio"]).optional(),
         twilio_account_sid: z.string().max(64).optional(),
         /** Omit to keep the stored token; empty string clears it. */
@@ -182,7 +223,7 @@ export async function shareRoutes(app: FastifyInstance) {
     }
     const user = req.auth!.user;
     const changed: string[] = [];
-    const values: Partial<Record<(typeof keys)[number], unknown>> = { ...body, share_public_url: url, twilio_account_sid: sid, twilio_from: from };
+    const values: Partial<Record<(typeof keys)[number], unknown>> = { ...body, share_public_url: url, share_return_label: body.share_return_label?.trim(), twilio_account_sid: sid, twilio_from: from };
     for (const k of keys) {
       const v = values[k];
       if (v === undefined) continue;

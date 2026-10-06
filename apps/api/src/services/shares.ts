@@ -11,6 +11,10 @@
  *
  * Messages carry the firm's name, the link or the code, and the expiry date. Never the client's
  * name, never a figure from the return.
+ *
+ * Return link (Q75): optionally, the URL where the client reviews and e-signs the return in the
+ * firm's other app. Shown on the watch page as a button only after the client verifies; wrapped
+ * like the contact and wiped with it; audited by hostname only.
  */
 import { createHash, randomBytes, randomInt, timingSafeEqual } from "node:crypto";
 import type { FastifyInstance, FastifyRequest } from "fastify";
@@ -64,6 +68,31 @@ export function normalizeContact(channel: Channel, raw: string): string | null {
     return isEmailAddress(e) ? e : null;
   }
   return normalizePhone(raw);
+}
+
+export const RETURN_URL_MAX = 2000;
+
+/**
+ * The return / e-sign link as stored: an https URL with no credentials. Null for "no link".
+ * Throws ReturnUrlError with a message for the preparer.
+ */
+export class ReturnUrlError extends Error {}
+
+export function normalizeReturnUrl(raw: string | null | undefined): string | null {
+  const s = (raw ?? "").trim();
+  if (!s) return null;
+  if (s.length > RETURN_URL_MAX) throw new ReturnUrlError(`The link is longer than ${RETURN_URL_MAX} characters`);
+  if (/\s/.test(s)) throw new ReturnUrlError("The link must not contain spaces");
+  let u: URL;
+  try {
+    u = new URL(s);
+  } catch {
+    throw new ReturnUrlError("Paste the full link, starting with https://");
+  }
+  if (u.protocol !== "https:") throw new ReturnUrlError("The link must start with https://");
+  if (u.username || u.password) throw new ReturnUrlError("The link must not contain a user name or password");
+  if (!u.hostname) throw new ReturnUrlError("Paste the full link, starting with https://");
+  return u.href;
 }
 
 export function maskContact(channel: Channel, contact: string): string {
@@ -181,6 +210,10 @@ export interface CreateShareInput {
   last4: string | null;
   /** Re-issue: reuse an existing Argon2id hash instead of hashing last4. */
   secretHash?: string | null;
+  /** Normalized return / e-sign link (normalizeReturnUrl), or null. */
+  returnUrl?: string | null;
+  /** Re-issue: carry the old share's wrapped link and host over as they are. */
+  returnUrlCarried?: { wrapped: string | null; host: string | null };
   actor: Actor;
 }
 
@@ -191,6 +224,11 @@ export async function createShare(app: FastifyInstance, input: CreateShareInput,
   const now = new Date();
   const expiresAt = new Date(now.getTime() + SHARE_DAYS * 86400_000);
   const secretHash = input.requireSecret ? (input.secretHash ?? (input.last4 ? await hashPassword(input.last4) : null)) : null;
+  const returnUrl = input.returnUrlCarried
+    ? { wrapped: input.returnUrlCarried.wrapped, host: input.returnUrlCarried.host }
+    : input.returnUrl
+      ? { wrapped: await app.storage.wrapSecret(input.returnUrl), host: new URL(input.returnUrl).hostname }
+      : { wrapped: null, host: null };
   const [share] = await app.db
     .insert(jobShares)
     .values({
@@ -201,6 +239,8 @@ export async function createShare(app: FastifyInstance, input: CreateShareInput,
       contactMasked: maskContact(input.channel, input.contact),
       secretHash,
       secretRequired: input.requireSecret,
+      returnUrlWrapped: returnUrl.wrapped,
+      returnUrlHost: returnUrl.host,
       maxSessions: MAX_SESSIONS,
       createdBy: input.actor.id,
       createdByLabel: input.actor.label,
@@ -214,8 +254,30 @@ export async function createShare(app: FastifyInstance, input: CreateShareInput,
     await app.db.delete(jobShares).where(eq(jobShares.id, share!.id));
     throw err;
   }
-  await recordShareEvent(app, share!, "created", { req, actor: input.actor, meta: { channel: input.channel, secret_required: input.requireSecret, expires_at: expiresAt.toISOString() } });
+  await recordShareEvent(app, share!, "created", { req, actor: input.actor, meta: { channel: input.channel, secret_required: input.requireSecret, expires_at: expiresAt.toISOString(), ...(returnUrl.host ? { return_link_host: returnUrl.host } : {}) } });
   return { share: share!, url };
+}
+
+/** Set, replace or remove a share's return / e-sign link (normalized already). Audited by hostname only. */
+export async function setReturnUrl(app: FastifyInstance, share: JobShare, url: string | null, opts: { req?: FastifyRequest; actor: Actor }): Promise<JobShare> {
+  const host = url ? new URL(url).hostname : null;
+  const [row] = await app.db
+    .update(jobShares)
+    .set({ returnUrlWrapped: url ? await app.storage.wrapSecret(url) : null, returnUrlHost: host })
+    .where(eq(jobShares.id, share.id))
+    .returning();
+  await recordShareEvent(app, share, url ? "return_link_set" : "return_link_cleared", { ...opts, meta: host ? { host } : { previous_host: share.returnUrlHost } });
+  return row!;
+}
+
+/** The return / e-sign link to show a verified client, or null. A stored value that no longer validates is dropped. */
+export async function returnUrlFor(app: FastifyInstance, share: JobShare): Promise<string | null> {
+  if (!share.returnUrlWrapped) return null;
+  try {
+    return normalizeReturnUrl(await app.storage.unwrapSecret(share.returnUrlWrapped));
+  } catch {
+    return null;
+  }
 }
 
 export async function shareByToken(app: FastifyInstance, token: string): Promise<JobShare | null> {
@@ -333,11 +395,11 @@ export async function notePlayed(app: FastifyInstance, share: JobShare, sessionT
   }
 }
 
-/** Forget the contact and the last-4 hash. Idempotent. */
+/** Forget the contact, the last-4 hash and the return link. Idempotent. */
 export async function wipeShare(app: FastifyInstance, share: Pick<JobShare, "id" | "jobId">, event: "expired" | "job_purged", now = new Date()): Promise<void> {
   const wiped = await app.db
     .update(jobShares)
-    .set({ contactWrapped: null, secretHash: null, wipedAt: now })
+    .set({ contactWrapped: null, secretHash: null, returnUrlWrapped: null, returnUrlHost: null, wipedAt: now })
     .where(and(eq(jobShares.id, share.id), isNull(jobShares.wipedAt)))
     .returning({ id: jobShares.id });
   if (wiped.length) {

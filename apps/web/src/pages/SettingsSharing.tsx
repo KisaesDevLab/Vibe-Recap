@@ -7,6 +7,7 @@ interface SharingSettingsResponse {
   settings: {
     share_enabled: boolean;
     share_public_url: string;
+    share_return_label: string;
     sms_provider: "" | "none" | "twilio";
     twilio_account_sid: string;
     twilio_from: string;
@@ -44,6 +45,7 @@ export function SettingsSharingPage() {
     const body: Record<string, unknown> = {
       share_enabled: fd.get("share_enabled") === "on",
       share_public_url: fd.get("share_public_url"),
+      share_return_label: fd.get("share_return_label"),
       sms_provider: fd.get("sms_provider"),
       twilio_account_sid: fd.get("twilio_account_sid"),
       twilio_from: fd.get("twilio_from"),
@@ -106,6 +108,9 @@ export function SettingsSharingPage() {
               }
             >
               <Input name="share_public_url" defaultValue={s.share_public_url} placeholder="https://watch.yourfirm.com" />
+            </Field>
+            <Field label="Return link button" hint="The button the client sees under the video when the preparer adds a tax return / e-sign link to the share. Blank uses the default.">
+              <Input name="share_return_label" defaultValue={s.share_return_label} maxLength={60} placeholder="Review and sign your return" />
             </Field>
             <div className="text-sm text-slate-600">
               Email: {st.channels.email ? <Badge tone="green">ready</Badge> : <Badge tone="slate">{(st.channelReasons.email ?? "off").toLowerCase()}</Badge>}{" "}

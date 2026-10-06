@@ -37,11 +37,14 @@ export const SETTING_DEFAULTS = {
   // Client sharing (Q73): a verified, time-limited watch link on the public watch host. Off by default.
   share_enabled: false,
   share_public_url: "" as string, // empty = SHARE_PUBLIC_URL env
+  share_return_label: "" as string, // watch-page button for the return / e-sign link (Q75); empty = DEFAULT_RETURN_LABEL
   sms_provider: "" as "" | "none" | "twilio", // "" = SMS_PROVIDER env (the appliance's Email & SMS setting)
   twilio_account_sid: "" as string, // empty = TWILIO_ACCOUNT_SID env
   twilio_auth_token: "" as string, // empty = TWILIO_AUTH_TOKEN env
   twilio_from: "" as string, // E.164 number or Messaging Service SID (MG...); empty = TWILIO_FROM, then FROM_NUMBER env
 };
+
+export const DEFAULT_RETURN_LABEL = "Review and sign your return";
 
 /** Settings that never leave the box in an export and are never imported. */
 export const SECRET_SETTING_KEYS = ["emailit_api_key", "twilio_auth_token"] as const satisfies readonly SettingKey[];

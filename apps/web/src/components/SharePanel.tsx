@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import type { JobDetailDto, ShareChannel, ShareDto, ShareEventDto, SharesResponse } from "@vibe-recap/shared";
 import { useApi } from "../lib/useApi";
-import { ApiError, post } from "../lib/api";
+import { ApiError, post, put } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { fmtDate } from "../lib/format";
 import { Alert, Badge, Button, Card, Field, Input, Select } from "../ui";
@@ -35,6 +35,8 @@ const EVENT_LABEL: Record<string, string> = {
   revoked: "Revoked",
   expired: "Expired; contact erased",
   job_purged: "Job purged; contact erased",
+  return_link_set: "Return link set",
+  return_link_cleared: "Return link removed",
 };
 
 /** "Chrome on Windows" from a user-agent string; good enough for a timeline. */
@@ -48,6 +50,24 @@ function browser(ua: string | null): string {
 function ShareRow({ share, jobId, canManage, onChanged }: { share: ShareDto; jobId: string; canManage: boolean; onChanged: (msg?: string) => void }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [link, setLink] = useState("");
+  async function saveLink(url: string | null) {
+    if (url === null && !confirm("Remove the return link? The client will no longer see the button.")) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      await put(`/api/jobs/${jobId}/shares/${share.id}/return-link`, { url });
+      setEditing(false);
+      setLink("");
+      onChanged(url ? "Return link saved. The client sees it after they verify." : "Return link removed.");
+    } catch (e) {
+      setErr(e instanceof ApiError ? e.message : "Could not save the link");
+    } finally {
+      setBusy(false);
+    }
+  }
+  const linkEditable = canManage && !share.revokedAt && !share.wiped && share.state !== "expired";
   async function act(path: "revoke" | "reissue") {
     if (path === "revoke" && !confirm("Revoke this link? The client will no longer be able to open it.")) return;
     setBusy(true);
@@ -93,6 +113,41 @@ function ShareRow({ share, jobId, canManage, onChanged }: { share: ShareDto; job
         {share.cooldownUntil ? ` · cooling down until ${fmtDate(share.cooldownUntil)}` : ""}
         {share.revokedAt ? ` · revoked by ${share.revokedByLabel ?? "?"}` : ""}
       </div>
+      <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+        <span>{share.returnLinkHost ? `Return / e-sign link: ${share.returnLinkHost}` : "No return / e-sign link"}</span>
+        {linkEditable && !editing && (
+          <>
+            <button type="button" className="text-brand underline disabled:opacity-60" disabled={busy} onClick={() => setEditing(true)}>
+              {share.returnLinkHost ? "Replace" : "Add"}
+            </button>
+            {share.returnLinkHost && (
+              <button type="button" className="text-brand underline disabled:opacity-60" disabled={busy} onClick={() => saveLink(null)}>
+                Remove
+              </button>
+            )}
+          </>
+        )}
+      </div>
+      {editing && (
+        <form
+          className="mt-2 flex flex-wrap items-center gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void saveLink(link);
+          }}
+        >
+          <Input className="min-w-[16rem] flex-1" type="url" autoComplete="off" required value={link} onChange={(e) => setLink(e.target.value)} placeholder="https://…" />
+          <Button size="sm" type="submit" disabled={busy || !link.trim()}>
+            Save
+          </Button>
+          <Button size="sm" variant="secondary" type="button" disabled={busy} onClick={() => {
+              setEditing(false);
+              setLink("");
+            }}>
+            Cancel
+          </Button>
+        </form>
+      )}
       {err && (
         <div className="mt-2">
           <Alert kind="error">{err}</Alert>
@@ -132,6 +187,7 @@ export function SharePanel({ job, onChanged }: { job: JobDetailDto; onChanged: (
   const [contact, setContact] = useState("");
   const [requireSecret, setRequireSecret] = useState(true);
   const [last4, setLast4] = useState("");
+  const [returnUrl, setReturnUrl] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ kind: "error" | "success"; text: string } | null>(null);
 
@@ -146,10 +202,11 @@ export function SharePanel({ job, onChanged }: { job: JobDetailDto; onChanged: (
     setBusy(true);
     setMsg(null);
     try {
-      await post(`/api/jobs/${job.id}/shares`, { channel, contact, requireSecret, last4: requireSecret ? last4 : null });
+      await post(`/api/jobs/${job.id}/shares`, { channel, contact, requireSecret, last4: requireSecret ? last4 : null, returnUrl: returnUrl.trim() || null });
       setMsg({ kind: "success", text: `Link sent. ${job.status === "approved" ? "The job is now released. " : ""}The client gets a one-time code when they open it.` });
       setContact("");
       setLast4("");
+      setReturnUrl("");
       await reload();
       onChanged();
     } catch (err) {
@@ -208,6 +265,9 @@ export function SharePanel({ job, onChanged }: { job: JobDetailDto; onChanged: (
               <Input className="max-w-[8rem]" type="password" inputMode="numeric" autoComplete="off" maxLength={4} pattern="[0-9]{4}" required value={last4} onChange={(e) => setLast4(e.target.value.replace(/\D/g, ""))} />
             </Field>
           )}
+          <Field label="Tax return / e-sign link (optional)" hint="Paste the client's link from the firm's return and e-sign app. After they verify, the watch page shows a button to it. You can add or change it later.">
+            <Input type="url" autoComplete="off" value={returnUrl} onChange={(e) => setReturnUrl(e.target.value)} placeholder="https://…" />
+          </Field>
           <Button type="submit" disabled={busy || !contact.trim() || (requireSecret && last4.length !== 4)}>
             Send link
           </Button>

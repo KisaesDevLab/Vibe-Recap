@@ -413,8 +413,8 @@ export type JobFeedback = typeof jobFeedback.$inferSelect;
 // Client sharing (Q73). A preparer shares an approved video with the client through a link on
 // the public watch host. The link alone plays nothing: the client asks for a one-time code, which
 // goes to the contact the preparer entered, and optionally answers the last four digits of their
-// SSN. Only hashes of the link token, the code and the last four are stored; the contact is
-// wrapped with the master key and wiped when the share ends.
+// SSN. Only hashes of the link token, the code and the last four are stored; the contact (and the
+// return / e-sign link, Q75) is wrapped with the master key and wiped when the share ends.
 // ---------------------------------------------------------------------------
 
 export const jobShares = pgTable(
@@ -433,6 +433,13 @@ export const jobShares = pgTable(
     /** Argon2id of the last four digits of the SSN, when the preparer asked for that check. */
     secretHash: text("secret_hash"),
     secretRequired: boolean("secret_required").notNull().default(false),
+    /**
+     * Where the client reviews and signs the return in the firm's other app (Q75), shown as a button
+     * once they have verified. Wrapped like the contact (it may carry its own token) and wiped with it;
+     * only the hostname is kept in the clear for the job page.
+     */
+    returnUrlWrapped: text("return_url_wrapped"),
+    returnUrlHost: text("return_url_host"),
     maxSessions: integer("max_sessions").notNull(),
     sessionsUsed: integer("sessions_used").notNull().default(0),
     failedAttempts: integer("failed_attempts").notNull().default(0),

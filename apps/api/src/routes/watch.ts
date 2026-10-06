@@ -11,6 +11,9 @@
  *
  * The page is rendered here, not by the React app, so the public host serves no staff code. Its
  * one script and one stylesheet carry a per-response nonce under a strict CSP.
+ *
+ * Once verified, the page may also carry a button to the return / e-sign link the preparer pasted
+ * (Q75): a plain link out to the firm's other app, never shown before verification.
  */
 import { randomBytes } from "node:crypto";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
@@ -18,8 +21,8 @@ import { and, desc, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { files, jobs, type FileRow, type JobShare } from "../db/schema.js";
 import { escapeHtml } from "../services/email-templates.js";
-import { getAllSettings } from "../services/settings.js";
-import { notePlayed, requestCode, sessionValid, shareBlocked, shareByToken, sharePublicUrl, verifyShare, SESSION_TTL_S } from "../services/shares.js";
+import { DEFAULT_RETURN_LABEL, getAllSettings } from "../services/settings.js";
+import { notePlayed, requestCode, returnUrlFor, sessionValid, shareBlocked, shareByToken, sharePublicUrl, verifyShare, SESSION_TTL_S } from "../services/shares.js";
 
 const COOKIE = "recap_watch";
 const PLAYABLE: string[] = ["approved", "released"];
@@ -85,7 +88,7 @@ function securityHeaders(reply: FastifyReply, nonce?: string) {
 type PageState =
   | { kind: "gone"; message: string }
   | { kind: "verify"; masked: string; channel: string; secretRequired: boolean; sessionsLeft: number; expires: string }
-  | { kind: "watch"; token: string; hasCaptions: boolean; expires: string };
+  | { kind: "watch"; token: string; hasCaptions: boolean; expires: string; returnUrl: string | null; returnLabel: string };
 
 function renderPage(o: { firm: string; logo: string | null; color: string; state: PageState; nonce: string }): string {
   const firm = escapeHtml(o.firm || "Your tax preparer");
@@ -116,6 +119,7 @@ function renderPage(o: { firm: string; logo: string | null; color: string; state
   <source src="/watch/${s.token}/video.mp4" type="video/mp4">
   ${s.hasCaptions ? `<track kind="captions" srclang="en" label="English" src="/watch/${s.token}/captions.vtt" default>` : ""}
 </video>
+${s.returnUrl ? `<p><a class="btn" href="${escapeHtml(s.returnUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(s.returnLabel)}</a></p>` : ""}
 <p class="muted">Prepared by ${firm}. The link expires ${escapeHtml(s.expires)}. Questions about your return? Contact ${firm}.</p>`;
   }
   const script =
@@ -169,6 +173,7 @@ input{width:100%;max-width:240px;font-size:20px;letter-spacing:2px;padding:8px 1
 button{margin-top:16px;background:var(--brand);color:#fff;border:0;border-radius:6px;padding:10px 18px;font-size:15px;font-weight:600;cursor:pointer}
 button:disabled{opacity:.6}button.link{background:none;color:var(--brand);padding:10px 6px;font-weight:500}
 @media (prefers-color-scheme: dark){button.link{color:var(--ink)}}
+a.btn{display:inline-block;margin-top:8px;background:var(--brand);color:#fff;border-radius:6px;padding:10px 18px;font-size:15px;font-weight:600;text-decoration:none}
 .bad{color:#b91c1c}video{width:100%;border-radius:8px;background:#000}
 </style></head>
 <body><main><header>${logo}<span class="firm">${firm}</span></header><section>${body}</section></main>${script}</body></html>`;
@@ -196,7 +201,14 @@ export async function watchRoutes(app: FastifyInstance) {
       state = { kind: "gone", message: "This video is no longer available." };
       reply.code(410);
     } else if (await sessionValid(app, share, cookieValue(req))) {
-      state = { kind: "watch", token, hasCaptions: !!(await liveFile(app, share.jobId, "vtt")), expires: expiryText(share.expiresAt) };
+      state = {
+        kind: "watch",
+        token,
+        hasCaptions: !!(await liveFile(app, share.jobId, "vtt")),
+        expires: expiryText(share.expiresAt),
+        returnUrl: await returnUrlFor(app, share),
+        returnLabel: s.share_return_label.trim() || DEFAULT_RETURN_LABEL,
+      };
     } else if (share.sessionsUsed >= share.maxSessions) {
       state = { kind: "gone", message: "This link has been used the maximum number of times." };
       reply.code(410);

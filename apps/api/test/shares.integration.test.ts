@@ -331,6 +331,70 @@ describe.skipIf(!available)("client sharing (Q73)", () => {
     }
   });
 
+  it("return / e-sign link (Q75): shown only after verifying, editable, kept on re-issue, wiped at expiry, audited by host", async () => {
+    const label = await admin.request("PUT", "/api/settings/sharing", { share_return_label: "  Sign your return  " });
+    expect(label.statusCode, label.body).toBe(200);
+    expect(label.json().settings.share_return_label).toBe("Sign your return");
+
+    const jobId = await seedJob();
+    const bad = await admin.post(`/api/jobs/${jobId}/shares`, { channel: "email", contact: "nine@example.net", requireSecret: false, returnUrl: "http://sign.example.org/x" });
+    expect(bad.statusCode).toBe(400);
+    expect(bad.json().message).toMatch(/https/);
+    const url = 'https://sign.example.org/c/abc?t=1&u=2&q="><b>';
+    const res = await admin.post(`/api/jobs/${jobId}/shares`, { channel: "email", contact: "nine@example.net", requireSecret: false, returnUrl: url });
+    expect(res.statusCode, res.body).toBe(200);
+    expect(res.json().share.returnLinkHost).toBe("sign.example.org");
+    const msg = ctx.email.last()!;
+    expect(msg.text).not.toContain("sign.example.org");
+    const path = linkPath(msg.text);
+    const share = await shareOf(jobId);
+    expect(share.returnUrlWrapped).not.toContain("sign.example.org");
+
+    // Not on the code-entry page; on the player page once verified, escaped, opening a new tab.
+    const w = watcher();
+    expect((await w.get(path)).body).not.toContain("sign.example.org");
+    await w.post(`${path}/code`);
+    expect((await w.post(`${path}/verify`, { code: lastCode(ctx.email.last()!.subject) })).statusCode).toBe(200);
+    const page = (await w.get(path)).body;
+    expect(page).toContain('href="https://sign.example.org/c/abc?t=1&amp;u=2&amp;q=%22%3E%3Cb%3E" target="_blank" rel="noopener noreferrer">Sign your return</a>');
+    expect(page).not.toContain("<b>");
+
+    // Edit: staff cannot; a preparer replaces and removes it.
+    const route = `/api/jobs/${jobId}/shares/${share.id}/return-link`;
+    expect((await staff.request("PUT", route, { url: "https://other.example.org/x" })).statusCode).toBe(403);
+    for (const u of ["ftp://other.example.org/x", "javascript:alert(1)", "https://user:pw@other.example.org/x", "other.example.org/x", "https://other.example.org/a b"]) {
+      expect((await admin.request("PUT", route, { url: u })).statusCode, u).toBe(400);
+    }
+    const replaced = await admin.request("PUT", route, { url: "https://other.example.org/x/secret-token" });
+    expect(replaced.statusCode, replaced.body).toBe(200);
+    expect(replaced.json().share.returnLinkHost).toBe("other.example.org");
+    expect((await w.get(path)).body).toContain('href="https://other.example.org/x/secret-token"');
+    await setSetting(ctx.db, "share_return_label", "", null);
+    expect((await w.get(path)).body).toContain(">Review and sign your return</a>");
+    const removed = await admin.request("PUT", route, { url: null });
+    expect(removed.json().share.returnLinkHost).toBeNull();
+    expect((await w.get(path)).body).not.toContain('class="btn"');
+    const audits = await ctx.db.execute<{ action: string; meta: Record<string, unknown> }>(sql`select action, meta from audit_events where action like 'share.return_link_%' and target_id = ${jobId} order by id`);
+    expect(audits.map((a) => a.action)).toEqual(["share.return_link_set", "share.return_link_cleared"]);
+    expect(JSON.stringify(audits)).not.toMatch(/secret-token|\/c\/abc/);
+
+    // Re-issue carries the link; a revoked share cannot be edited.
+    await admin.request("PUT", route, { url: "https://sign.example.org/again" });
+    const re = await admin.post(`/api/jobs/${jobId}/shares/${share.id}/reissue`);
+    expect(re.statusCode, re.body).toBe(200);
+    expect(re.json().share.returnLinkHost).toBe("sign.example.org");
+    expect((await admin.request("PUT", route, { url: "https://sign.example.org/late" })).statusCode).toBe(409);
+
+    // Expiry wipes it with the contact.
+    const fresh = await shareOf(jobId);
+    expect(fresh.returnUrlWrapped).not.toBeNull();
+    await ctx.db.update(jobShares).set({ expiresAt: new Date(Date.now() - 1000) }).where(eq(jobShares.id, fresh.id));
+    await sweepShares(ctx.app);
+    const wiped = await shareOf(jobId);
+    expect(wiped.returnUrlWrapped).toBeNull();
+    expect(wiped.returnUrlHost).toBeNull();
+  });
+
   it("the Twilio token is never exported, and share links are masked in logs", async () => {
     const exp = await admin.get("/api/settings/backup/export");
     expect(exp.body).not.toContain("secret-token");
